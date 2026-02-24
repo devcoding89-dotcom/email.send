@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-bg",
+      "description": "Abstract data network",
+      "imageUrl": "https://picsum.photos/seed/scoutier-hero/1200/800",
+      "imageHint": "data network"
+    },
+    {
+      "id": "app-feature",
+      "description": "Person working on digital data",
+      "imageUrl": "https://picsum.photos/seed/scoutier-work/800/600",
+      "imageHint": "digital workspace"
+    }
+  ]
+}
