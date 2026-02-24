@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState } from "react";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, UserPlus, LogIn } from "lucide-react";
 
 export function AuthOverlay({ onSuccess }: { onSuccess: () => void }) {
+  const auth = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

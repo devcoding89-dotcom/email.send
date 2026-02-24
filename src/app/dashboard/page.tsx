@@ -1,11 +1,9 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc } from "firebase/firestore";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,34 +25,21 @@ interface ParseRecord {
 }
 
 export default function Dashboard() {
-  const [user, setUser] = useState<User | null>(null);
-  const [history, setHistory] = useState<ParseRecord[]>([]);
+  const { user, isUserLoading } = useUser();
+  const db = useFirestore();
   const [selected, setSelected] = useState<ParseRecord | null>(null);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => setUser(u));
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
+  const historyQuery = useMemoFirebase(() => {
+    if (!user || !db) return null;
+    return query(
       collection(db, `users/${user.uid}/parses`),
       orderBy("createdAt", "desc")
     );
+  }, [user, db]);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ParseRecord[];
-      setHistory(records);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+  const { data: history = [] } = useCollection<ParseRecord>(historyQuery);
 
   const deleteRecord = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,7 +53,7 @@ export default function Dashboard() {
     }
   };
 
-  const filteredHistory = history.filter(h => 
+  const filteredHistory = (history || []).filter(h => 
     h.emails.some(e => e.includes(search.toLowerCase())) ||
     h.text.toLowerCase().includes(search.toLowerCase())
   );
@@ -79,10 +64,18 @@ export default function Dashboard() {
     downloadFile(csv, `extraction_${selected.id}.csv`, "text/csv");
   };
 
+  if (isUserLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-muted-foreground animate-pulse">Loading...</p>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-muted-foreground animate-pulse">Redirecting...</p>
+        <p className="text-muted-foreground">Please sign in to view your dashboard.</p>
       </div>
     );
   }

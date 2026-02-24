@@ -1,27 +1,16 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { useUser } from "@/firebase";
 import { Navbar } from "@/components/layout/Navbar";
 import { AuthOverlay } from "@/components/auth/AuthOverlay";
 import { ScoutView } from "@/components/scout/ScoutView";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Globe, Github } from "lucide-react";
 
-export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function Home() {
+  const { user, isUserLoading } = useUser();
 
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-  }, []);
-
-  if (loading) {
+  if (isUserLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <Zap className="h-10 w-10 animate-pulse text-primary" />
@@ -34,7 +23,7 @@ export default function Home() {
       <Navbar />
       
       {!user ? (
-        <AuthOverlay onSuccess={() => window.location.reload()} />
+        <AuthOverlay onSuccess={() => {}} />
       ) : (
         <main className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
           <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -82,3 +71,5 @@ export default function Home() {
     </div>
   );
 }
+
+export default Home;

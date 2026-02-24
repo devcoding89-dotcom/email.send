@@ -1,9 +1,7 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { useAuth, useUser } from "@/firebase";
+import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -11,11 +9,8 @@ import { Zap, History, LogOut, Settings, User as UserIcon } from "lucide-react";
 import Link from "next/link";
 
 export function Navbar() {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => setUser(u));
-  }, []);
+  const { user } = useUser();
+  const auth = useAuth();
 
   const handleSignOut = () => signOut(auth);
 

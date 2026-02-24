@@ -1,7 +1,7 @@
-
 "use client";
 
 import { useState } from "react";
+import { useUser, useFirestore } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Download, Share2, Sparkles, Trash2, Mail, Users, Building, DownloadCloud, Loader2 } from "lucide-react";
+import { Copy, Download, Sparkles, Trash2, Mail, Users, Building, DownloadCloud, Loader2 } from "lucide-react";
 import { generateCSV, downloadFile } from "@/lib/extractor";
-import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 interface ExtractionResult {
@@ -23,6 +22,8 @@ interface ExtractionResult {
 }
 
 export function ScoutView() {
+  const { user } = useUser();
+  const db = useFirestore();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [useAI, setUseAI] = useState(false);
@@ -51,8 +52,9 @@ export function ScoutView() {
         });
 
         // Save to history if logged in
-        if (auth.currentUser) {
-          await addDoc(collection(db, `users/${auth.currentUser.uid}/parses`), {
+        if (user && db) {
+          addDoc(collection(db, `users/${user.uid}/parses`), {
+            userId: user.uid,
             text,
             emails: data.emails,
             entities: data.entities,
