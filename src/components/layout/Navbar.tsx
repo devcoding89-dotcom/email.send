@@ -8,14 +8,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Zap, History, LogOut, Settings, User as UserIcon, LayoutDashboard, Sparkles, Send, Users } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export function Navbar({ onAuthClick }: { onAuthClick?: () => void }) {
   const { user } = useUser();
   const auth = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
 
-  const handleSignOut = () => signOut(auth);
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push("/");
+  };
 
   return (
     <nav className="sticky top-0 z-[50] w-full border-b glass">
