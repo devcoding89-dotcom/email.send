@@ -22,38 +22,38 @@ export function Navbar({ onAuthClick }: { onAuthClick?: () => void }) {
 
   return (
     <nav className="sticky top-0 z-[100] w-full glass">
-      <div className="container mx-auto flex h-24 items-center justify-between px-6">
-        <div className="flex items-center gap-10 md:gap-14">
-          <Link href="/" className="flex items-center gap-4 group">
-            <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-primary text-primary-foreground shadow-2xl shadow-primary/40 group-hover:scale-110 transition-all duration-500">
-              <Zap className="h-8 w-8 fill-primary-foreground" />
+      <div className="container mx-auto flex h-20 items-center justify-between px-4">
+        <div className="flex items-center gap-6 md:gap-10">
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
+              <Zap className="h-6 w-6 fill-primary-foreground" />
             </div>
-            <span className="hidden sm:inline-block text-3xl font-black tracking-tighter font-headline uppercase">Scoutier</span>
+            <span className="hidden sm:inline-block text-xl font-black tracking-tighter font-headline uppercase">Scoutier</span>
           </Link>
 
           {user && (
-            <div className="flex items-center gap-2">
-              <Button variant={pathname === "/" ? "secondary" : "ghost"} asChild className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest text-xs">
+            <div className="flex items-center gap-1">
+              <Button variant={pathname === "/" ? "secondary" : "ghost"} asChild className="rounded-xl h-10 px-3 md:px-5 font-black uppercase tracking-widest text-[10px]">
                 <Link href="/">
-                  <Sparkles className="mr-3 h-4 w-4 fill-current" />
+                  <Sparkles className="md:mr-2 h-4 w-4 fill-current" />
                   <span className="hidden md:inline">Parser</span>
                 </Link>
               </Button>
-              <Button variant={pathname === "/campaigns" ? "secondary" : "ghost"} asChild className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest text-xs">
+              <Button variant={pathname === "/campaigns" ? "secondary" : "ghost"} asChild className="rounded-xl h-10 px-3 md:px-5 font-black uppercase tracking-widest text-[10px]">
                 <Link href="/campaigns">
-                  <Send className="mr-3 h-4 w-4 fill-current" />
+                  <Send className="md:mr-2 h-4 w-4 fill-current" />
                   <span className="hidden md:inline">Campaigns</span>
                 </Link>
               </Button>
-              <Button variant={pathname === "/contacts" ? "secondary" : "ghost"} asChild className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest text-xs">
+              <Button variant={pathname === "/contacts" ? "secondary" : "ghost"} asChild className="rounded-xl h-10 px-3 md:px-5 font-black uppercase tracking-widest text-[10px]">
                 <Link href="/contacts">
-                  <Users className="mr-3 h-4 w-4 fill-current" />
+                  <Users className="md:mr-2 h-4 w-4 fill-current" />
                   <span className="hidden md:inline">Contacts</span>
                 </Link>
               </Button>
-              <Button variant={pathname === "/dashboard" ? "secondary" : "ghost"} asChild className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest text-xs">
+              <Button variant={pathname === "/dashboard" ? "secondary" : "ghost"} asChild className="rounded-xl h-10 px-3 md:px-5 font-black uppercase tracking-widest text-[10px]">
                 <Link href="/dashboard">
-                  <History className="mr-3 h-4 w-4 fill-current" />
+                  <History className="md:mr-2 h-4 w-4 fill-current" />
                   <span className="hidden md:inline">History</span>
                 </Link>
               </Button>
@@ -61,48 +61,48 @@ export function Navbar({ onAuthClick }: { onAuthClick?: () => void }) {
           )}
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-14 w-14 rounded-2xl overflow-hidden border border-white/10 p-0 hover:scale-105 transition-all bg-secondary/20">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-xl overflow-hidden border border-white/10 p-0 bg-secondary/20">
                   <Avatar className="h-full w-full rounded-none">
                     <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} alt={user.email || ""} />
-                    <AvatarFallback className="rounded-none bg-secondary/50"><UserIcon className="w-6 h-6 text-muted-foreground" /></AvatarFallback>
+                    <AvatarFallback className="rounded-none bg-secondary/50"><UserIcon className="w-5 h-5 text-muted-foreground" /></AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-72 mt-4 rounded-3xl shadow-2xl border-white/10 bg-popover/95 backdrop-blur-xl p-3" align="end">
-                <DropdownMenuLabel className="font-normal p-5">
-                  <div className="flex flex-col space-y-2">
-                    <p className="text-sm font-black uppercase tracking-widest">Protocol User</p>
-                    <p className="text-xs font-bold text-muted-foreground truncate">{user.email}</p>
+              <DropdownMenuContent className="w-64 mt-2 rounded-2xl shadow-xl border-white/10 bg-popover/95 backdrop-blur-xl p-2" align="end">
+                <DropdownMenuLabel className="font-normal p-4">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-xs font-black uppercase tracking-widest">Protocol User</p>
+                    <p className="text-[10px] font-bold text-muted-foreground truncate">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem asChild className="h-14 cursor-pointer rounded-2xl font-bold px-4 hover:bg-white/5">
+                <DropdownMenuItem asChild className="h-10 cursor-pointer rounded-xl font-bold px-3">
                   <Link href="/dashboard">
-                    <History className="mr-4 h-5 w-5 text-primary" />
+                    <History className="mr-3 h-4 w-4 text-primary" />
                     Extraction Logs
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild className="h-14 cursor-pointer rounded-2xl font-bold px-4 hover:bg-white/5">
+                <DropdownMenuItem asChild className="h-10 cursor-pointer rounded-xl font-bold px-3">
                   <Link href="/campaigns">
-                    <Send className="mr-4 h-5 w-5 text-primary" />
+                    <Send className="mr-3 h-4 w-4 text-primary" />
                     Active Outreach
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={handleSignOut} className="h-14 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer rounded-2xl font-black uppercase tracking-widest text-xs px-4">
-                  <LogOut className="mr-4 h-5 w-5" />
+                <DropdownMenuItem onClick={handleSignOut} className="h-10 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer rounded-xl font-black uppercase tracking-widest text-[10px] px-3">
+                  <LogOut className="mr-3 h-4 w-4" />
                   Terminate Session
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-xs hidden sm:flex h-12 px-6" onClick={onAuthClick}>Sign In</Button>
-              <Button className="rounded-2xl px-8 h-12 font-black uppercase tracking-widest text-xs shadow-2xl shadow-primary/40 transition-all hover:scale-105" onClick={onAuthClick}>Access Portal</Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[10px] hidden sm:flex h-10 px-4" onClick={onAuthClick}>Sign In</Button>
+              <Button className="rounded-xl px-5 h-10 font-black uppercase tracking-widest text-[10px] shadow-lg" onClick={onAuthClick}>Portal</Button>
             </div>
           )}
         </div>

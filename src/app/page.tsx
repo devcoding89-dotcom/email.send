@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { AuthOverlay } from "@/components/auth/AuthOverlay";
 import { ScoutView } from "@/components/scout/ScoutView";
 import { Button } from "@/components/ui/button";
-import { Zap, Github, ArrowRight, MousePointer2, Layers, Sparkles } from "lucide-react";
+import { Zap, Github, ArrowRight, MousePointer2, Layers } from "lucide-react";
 import { useState } from "react";
 
 export default function Home() {
@@ -15,7 +15,7 @@ export default function Home() {
   if (isUserLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Zap className="h-12 w-12 animate-pulse text-primary" />
+        <Zap className="h-10 w-10 text-primary" />
       </div>
     );
   }
@@ -27,91 +27,88 @@ export default function Home() {
       {!user ? (
         <main className="flex-1">
           {/* Hero Section */}
-          <section className="relative pt-24 pb-32 md:pt-40 md:pb-52 overflow-hidden hero-gradient">
-            <div className="container mx-auto px-6 relative z-10 text-center">
-              <div className="max-w-5xl mx-auto space-y-10">
-                <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary/20 text-primary-foreground text-xs md:text-sm font-black tracking-widest animate-in fade-in slide-in-from-bottom-4 duration-1000 uppercase">
+          <section className="relative pt-20 pb-24 md:pt-32 md:pb-40 overflow-hidden hero-gradient">
+            <div className="container mx-auto px-4 relative z-10 text-center">
+              <div className="max-w-4xl mx-auto space-y-8">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 text-primary-foreground text-xs font-black tracking-widest uppercase">
                   <Zap className="w-4 h-4 fill-primary" />
                   Autonomous Data Scouting
                 </div>
-                <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold font-headline leading-[0.9] text-foreground animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-200">
+                <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold font-headline leading-tight text-foreground tracking-tighter">
                   Precision <br className="hidden md:block" />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary animate-gradient">Extraction.</span>
+                  <span className="text-primary">Extraction.</span>
                 </h1>
-                <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 px-4">
+                <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-2">
                   The ultimate intelligence layer for modern outreach. Transform chaotic data into actionable leads with surgically precise AI.
                 </p>
-                <div className="flex flex-col sm:flex-row justify-center gap-6 pt-10 px-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500">
-                  <Button size="lg" className="h-16 md:h-20 px-10 md:px-14 text-xl md:text-2xl rounded-3xl shadow-2xl shadow-primary/40 hover:scale-105 transition-all font-black" onClick={() => setShowAuth(true)}>
+                <div className="flex flex-col sm:flex-row justify-center gap-4 pt-6 px-4">
+                  <Button size="lg" className="h-14 md:h-16 px-8 md:px-10 text-lg md:text-xl rounded-2xl shadow-lg shadow-primary/20 font-black" onClick={() => setShowAuth(true)}>
                     Initialize System
-                    <ArrowRight className="ml-3 w-6 h-6" />
+                    <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
-                  <Button size="lg" variant="secondary" className="h-16 md:h-20 px-10 md:px-14 text-xl md:text-2xl rounded-3xl bg-secondary/50 backdrop-blur-md hover:bg-secondary/80 transition-all font-bold">
+                  <Button size="lg" variant="secondary" className="h-14 md:h-16 px-8 md:px-10 text-lg md:text-xl rounded-2xl bg-secondary font-bold">
                     System Demo
                   </Button>
                 </div>
               </div>
             </div>
-
-            {/* Background Decorative Elements */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1400px] h-[900px] bg-primary/10 rounded-full blur-[180px] -z-10" />
           </section>
 
           {/* Features Section */}
-          <section className="py-32 md:py-48 bg-background relative border-t border-white/5">
-            <div className="container mx-auto px-6 relative z-10">
-              <div className="text-center mb-20 md:mb-32 space-y-6">
-                <h2 className="text-4xl md:text-6xl font-black font-headline tracking-tighter uppercase">High-Frequency Intelligence</h2>
-                <p className="text-muted-foreground text-xl max-w-2xl mx-auto">Proprietary engines built for speed, accuracy, and mass scale.</p>
+          <section className="py-24 md:py-32 bg-background relative border-t border-white/5">
+            <div className="container mx-auto px-4 relative z-10">
+              <div className="text-center mb-16 space-y-4">
+                <h2 className="text-3xl md:text-5xl font-black font-headline tracking-tighter uppercase">High-Frequency Intelligence</h2>
+                <p className="text-muted-foreground text-lg max-w-xl mx-auto">Proprietary engines built for speed, accuracy, and mass scale.</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { icon: MousePointer2, title: "Neural Isolation", desc: "Our neural regex engine extracts targets from the darkest corners of data dumps with zero friction." },
-                  { icon: Zap, title: "Agentic Detection", desc: "Beyond strings. Leverage multi-model GenAI to map names, roles, and organizations with contextual intent." },
-                  { icon: Layers, title: "Mass Serialization", desc: "Instantly serialize thousands of records into industry-standard formats for seamless CRM ingestion." }
+                  { icon: MousePointer2, title: "Neural Isolation", desc: "Our neural regex engine extracts targets from data dumps with zero friction." },
+                  { icon: Zap, title: "Agentic Detection", desc: "Beyond strings. Leverage GenAI to map names, roles, and organizations with contextual intent." },
+                  { icon: Layers, title: "Mass Serialization", desc: "Instantly serialize thousands of records into industry-standard formats for CRM ingestion." }
                 ].map((feature, i) => (
-                  <div key={i} className="group relative p-10 md:p-12 rounded-[3rem] bg-secondary/20 border border-white/5 hover:border-primary/50 transition-all duration-500 card-glow">
-                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-3xl bg-primary/20 flex items-center justify-center text-primary mb-10 group-hover:scale-110 transition-transform duration-500">
-                      <feature.icon className="w-8 h-8 md:w-10 md:h-10 fill-primary/20" />
+                  <div key={i} className="group relative p-8 md:p-10 rounded-3xl bg-secondary/20 border border-white/5 hover:border-primary/50 transition-colors card-glow">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary/20 flex items-center justify-center text-primary mb-8">
+                      <feature.icon className="w-6 h-6 md:w-7 md:h-7 fill-primary/20" />
                     </div>
-                    <h3 className="text-2xl md:text-3xl font-black font-headline mb-6 uppercase tracking-tighter">{feature.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed text-lg md:text-xl font-medium">{feature.desc}</p>
+                    <h3 className="text-xl md:text-2xl font-black font-headline mb-4 uppercase tracking-tighter">{feature.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed text-base md:text-lg font-medium">{feature.desc}</p>
                   </div>
                 ))}
               </div>
             </div>
           </section>
 
-          <footer className="py-24 border-t border-white/5 bg-black/40">
-            <div className="container mx-auto px-6">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-12 text-center md:text-left">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-primary rounded-2xl shadow-xl shadow-primary/30">
-                    <Zap className="w-8 h-8 text-primary-foreground fill-primary-foreground" />
+          <footer className="py-16 border-t border-white/5 bg-black/20">
+            <div className="container mx-auto px-4">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary rounded-xl">
+                    <Zap className="w-6 h-6 text-primary-foreground fill-primary-foreground" />
                   </div>
-                  <span className="text-3xl font-black font-headline tracking-tighter uppercase">Scoutier</span>
+                  <span className="text-2xl font-black font-headline tracking-tighter uppercase">Scoutier</span>
                 </div>
-                <div className="flex flex-wrap justify-center gap-10 text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">
-                  <a href="#" className="hover:text-primary transition-colors">Privacy Protocol</a>
-                  <a href="#" className="hover:text-primary transition-colors">Terms of Ops</a>
-                  <a href="#" className="hover:text-primary transition-colors">Documentation</a>
-                  <a href="#" className="hover:text-primary transition-colors hover:scale-125 transition-transform"><Github className="w-8 h-8" /></a>
+                <div className="flex flex-wrap justify-center gap-6 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                  <a href="#" className="hover:text-primary">Privacy</a>
+                  <a href="#" className="hover:text-primary">Terms</a>
+                  <a href="#" className="hover:text-primary">Docs</a>
+                  <a href="#" className="hover:text-primary"><Github className="w-6 h-6" /></a>
                 </div>
-                <p className="text-xs text-muted-foreground font-black uppercase tracking-widest">© 2024 Scoutier Inc. Built for Power Users.</p>
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">© 2024 Scoutier Inc.</p>
               </div>
             </div>
           </footer>
         </main>
       ) : (
-        <main className="flex-1 container mx-auto px-6 py-12 md:py-24 max-w-7xl">
-          <header className="mb-16 md:mb-24 space-y-6 md:space-y-10">
-            <div className="flex items-center gap-4 text-primary font-black text-xs md:text-sm uppercase tracking-[0.4em] animate-in slide-in-from-left duration-700">
-              <div className="h-[2px] w-12 md:w-20 bg-primary" />
+        <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl">
+          <header className="mb-12 space-y-4">
+            <div className="flex items-center gap-3 text-primary font-black text-xs uppercase tracking-widest">
+              <div className="h-[2px] w-8 bg-primary" />
               Intelligence Terminal
             </div>
-            <h1 className="text-5xl md:text-8xl font-black font-headline leading-[0.9] uppercase tracking-tighter">Extraction <br /> Engine</h1>
-            <p className="text-muted-foreground text-xl md:text-2xl max-w-4xl leading-relaxed font-medium">
-              Initialize a data pass to isolate targets. Activate AI Mode for deep-layer entity mapping and organization identification.
+            <h1 className="text-4xl md:text-6xl font-black font-headline leading-tight uppercase tracking-tighter">Extraction <br /> Engine</h1>
+            <p className="text-muted-foreground text-lg md:text-xl max-w-3xl leading-relaxed font-medium">
+              Initialize a data pass to isolate targets. Activate AI Mode for deep-layer entity mapping.
             </p>
           </header>
 
