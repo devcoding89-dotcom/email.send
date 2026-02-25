@@ -16,8 +16,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2, MailPlus, Loader2 } from "lucide-react";
-import { extractEmails } from "@/lib/extractor";
+import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2, MailPlus, Loader2, PlayCircle } from "lucide-react";
+import { extractEmails, personalizeTemplate } from "@/lib/extractor";
+import { sendCampaignEmail } from "@/app/actions/email-actions";
 
 interface Contact {
   id: string;
@@ -41,6 +42,10 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [manualEmails, setManualEmails] = useState("");
   const [isProcessingManual, setIsProcessingManual] = useState(false);
+  
+  // Test Email State
+  const [testEmail, setTestEmail] = useState("");
+  const [isTesting, setIsTesting] = useState(false);
 
   // Fetch available contacts
   const contactsQuery = useMemoFirebase(() => {
@@ -55,6 +60,45 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
 
   const insertToken = (token: string) => {
     setBody(prev => prev + `{{${token}}}`);
+  };
+
+  const handleSendTest = async () => {
+    if (!testEmail) {
+      toast({ variant: "destructive", title: "Test Email Required", description: "Enter an address to receive the test." });
+      return;
+    }
+    
+    setIsTesting(true);
+    try {
+      // Create a mock contact for the test
+      const mockContact = {
+        firstName: "Test",
+        lastName: "User",
+        email: testEmail,
+        company: "Scoutier Test Corp",
+        position: "Quality Assurance"
+      };
+
+      const personalizedBody = personalizeTemplate(body || "This is a test message from Scoutier.", mockContact);
+      const personalizedSubject = personalizeTemplate(subject || "Scoutier Test", mockContact);
+
+      const result = await sendCampaignEmail(testEmail, personalizedSubject, personalizedBody);
+      
+      if (result.success) {
+        toast({ 
+          title: "Test Sent!", 
+          description: result.status === 'simulated' 
+            ? "Simulated delivery successful. (Add SMTP credentials for real emails)" 
+            : `Email successfully delivered to ${testEmail}` 
+        });
+      } else {
+        toast({ variant: "destructive", title: "Delivery Failed", description: result.error });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "System Error", description: "Could not initiate test dispatch." });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleCreate = () => {
@@ -94,6 +138,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     setStep("content");
     setSelectedContactIds([]);
     setManualEmails("");
+    setTestEmail("");
   };
 
   const toggleContact = (id: string) => {
@@ -251,10 +296,37 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                     </div>
                     <Textarea 
                       placeholder="Hi {{firstName}}, I noticed {{company}}..." 
-                      className="min-h-[250px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
+                      className="min-h-[200px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
                       value={body}
                       onChange={e => setBody(e.target.value)}
                     />
+                  </div>
+
+                  {/* Real-time Test Section */}
+                  <div className="p-6 rounded-3xl bg-muted/30 border border-border/50 mt-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <PlayCircle className="h-5 w-5 text-primary" />
+                      <h4 className="font-bold text-sm">Real-time Test Delivery</h4>
+                    </div>
+                    <div className="flex gap-3">
+                      <Input 
+                        placeholder="Enter your email for a test send..." 
+                        className="rounded-xl h-12" 
+                        value={testEmail}
+                        onChange={e => setTestEmail(e.target.value)}
+                      />
+                      <Button 
+                        variant="secondary" 
+                        className="rounded-xl h-12 px-6 font-bold" 
+                        onClick={handleSendTest}
+                        disabled={isTesting}
+                      >
+                        {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Test"}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2 italic">
+                      Verify exactly how your email looks in your inbox before launching.
+                    </p>
                   </div>
                 </div>
               )}
