@@ -3,48 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --background: 240 10% 98%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
+  /* Deep Dark Theme as Default */
+  --background: 224 71% 4%;
+  --foreground: 213 31% 91%;
+  
+  --card: 224 71% 4%;
+  --card-foreground: 213 31% 91%;
+  
+  --popover: 224 71% 4%;
+  --popover-foreground: 213 31% 91%;
+  
   --primary: 263 70% 50%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
+  
+  --secondary: 222 47% 11%;
+  --secondary-foreground: 210 40% 98%;
+  
+  --muted: 223 47% 11%;
+  --muted-foreground: 215.4 16.3% 56.9%;
+  
   --accent: 316 70% 50%;
   --accent-foreground: 210 40% 98%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 263 70% 50%;
-  --radius: 1.25rem;
-}
-
-.dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 263 70% 50%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 316 70% 50%;
-  --accent-foreground: 210 40% 98%;
+  
   --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
+  --destructive-foreground: 210 40% 98%;
+  
+  --border: 216 34% 17%;
+  --input: 216 34% 17%;
   --ring: 263 70% 50%;
+  
+  --radius: 1.25rem;
 }
 
 @layer base {
@@ -52,20 +40,21 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground font-body antialiased selection:bg-primary/30;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-headline tracking-tight;
+    @apply font-headline tracking-tight text-foreground;
   }
 }
 
+/* Custom Utilities for the No-White Theme */
 .glass {
-  @apply bg-background/60 backdrop-blur-xl border border-white/10;
+  @apply bg-background/80 backdrop-blur-xl border-b border-white/5;
 }
 
 .hero-gradient {
-  background: radial-gradient(circle at top left, hsl(var(--primary) / 0.1), transparent 40%),
-              radial-gradient(circle at bottom right, hsl(var(--accent) / 0.1), transparent 40%);
+  background: radial-gradient(circle at top left, hsl(var(--primary) / 0.15), transparent 50%),
+              radial-gradient(circle at bottom right, hsl(var(--accent) / 0.15), transparent 50%);
 }
 
 .animate-gradient {
@@ -77,4 +66,22 @@
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+.card-glow {
+  @apply transition-all duration-300 hover:shadow-[0_0_30px_-10px_rgba(118,80,229,0.3)];
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded-full border-2 border-background;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground;
 }
