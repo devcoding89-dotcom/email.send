@@ -1,4 +1,3 @@
-
 'use server';
 
 import nodemailer from 'nodemailer';
@@ -36,11 +35,15 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
 
-  // Simulation mode check
+  // Simulation mode check: only simulate if credentials are missing or default
   if (!user || !pass || user.includes('example.com')) {
-    console.log('SMTP Simulation Mode: Please set a valid EMAIL_USER in .env');
+    console.log('SMTP Simulation Mode: Please set your real Brevo email in .env');
     await new Promise(resolve => setTimeout(resolve, 500));
-    return { success: true, status: 'simulated' };
+    return { 
+      success: true, 
+      status: 'simulated',
+      message: 'Email simulated. Update .env with your real Brevo email to send for real.'
+    };
   }
 
   try {
@@ -54,13 +57,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         pass: pass.trim(),
       },
       tls: {
-        // Essential for many cloud environments to prevent handshake errors
         rejectUnauthorized: false 
       }
     });
 
     // Send the email
-    // IMPORTANT: The 'from' address must be a verified sender in your Brevo account
     await transporter.sendMail({
       from: `"Scoutier Outreach" <${user}>`,
       to,
@@ -74,9 +75,9 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     
     let userFriendlyError = "Failed to send email.";
     if (error.message.includes('Authentication failed') || error.message.includes('Invalid login')) {
-      userFriendlyError = "SMTP Authentication Failed: Please check your EMAIL_USER and EMAIL_PASS in the .env file. Ensure EMAIL_USER is your Brevo login email.";
+      userFriendlyError = "SMTP Auth Error: Your EMAIL_USER must be your Brevo login email. Check .env.";
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `The email address ${user} is not a verified sender in your Brevo account.`;
+      userFriendlyError = `Sender error: ${user} is not a verified sender in Brevo.`;
     }
 
     return { 
