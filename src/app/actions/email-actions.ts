@@ -19,7 +19,7 @@ async function hasMXRecord(email: string): Promise<boolean> {
 }
 
 /**
- * Sends a personalized campaign email using SMTP via Nodemailer.
+ * Sends a personalized campaign email using Brevo SMTP.
  * Performs a multi-level validation check (Syntax + Domain MX) before transmission.
  */
 export async function sendCampaignEmail(to: string, subject: string, body: string) {
@@ -44,11 +44,13 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   }
 
   try {
+    // Configure for Brevo SMTP Relay
     const transporter = nodemailer.createTransport({
-      service: 'gmail', 
+      host: 'smtp-relay.brevo.com',
+      port: 587,
       auth: {
-        user: user,
-        pass: pass,
+        user: user, // Usually your Brevo account email
+        pass: pass, // Your Brevo API Key
       },
     });
 
@@ -61,7 +63,7 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
     return { success: true, status: 'sent' };
   } catch (error: any) {
-    console.error('Nodemailer error:', error);
+    console.error('SMTP error:', error);
     return { success: false, status: 'failed', error: error.message || 'SMTP Transmission Error' };
   }
 }
