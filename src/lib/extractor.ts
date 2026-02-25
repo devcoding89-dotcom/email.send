@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for email extraction, personalization, and CSV handling.
  */
@@ -11,14 +10,27 @@ export function extractEmails(text: string): string[] {
   
   const uniqueEmails = Array.from(new Set(matches.map(email => email.toLowerCase())));
   
-  return uniqueEmails.filter(email => {
-    return email.length >= 5 && (email.match(/@/g) || []).length === 1;
-  });
+  return uniqueEmails.filter(email => validateEmailFormat(email));
 }
 
+/**
+ * Robust email syntax validation using a comprehensive regex.
+ */
 export function validateEmailFormat(email: string): boolean {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return regex.test(email);
+  if (!email || email.length > 254) return false;
+  
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  
+  if (!emailRegex.test(email)) return false;
+
+  const parts = email.split("@");
+  if (parts.length !== 2) return false;
+
+  const domain = parts[1];
+  const domainParts = domain.split(".");
+  if (domainParts.length < 2) return false;
+
+  return true;
 }
 
 export function generateCSV(emails: string[]): string {
@@ -42,12 +54,13 @@ export function parseCSVContacts(csvText: string): any[] {
     const line = lines[i].trim();
     if (!line) continue;
     
-    // Simple CSV parser that handles basic commas (not quoted ones for now for speed)
+    // Simple CSV parser that handles basic commas
     const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
     
-    if (values[emailIdx]) {
+    const email = values[emailIdx];
+    if (email && validateEmailFormat(email)) {
       const contact: any = {
-        email: values[emailIdx],
+        email: email.toLowerCase(),
         firstName: values[headers.indexOf('firstname')] || values[headers.indexOf('first name')] || "",
         lastName: values[headers.indexOf('lastname')] || values[headers.indexOf('last name')] || "",
         company: values[headers.indexOf('company')] || values[headers.indexOf('organization')] || "",
