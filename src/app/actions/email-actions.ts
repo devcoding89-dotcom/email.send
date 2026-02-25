@@ -1,3 +1,4 @@
+
 'use server';
 
 import nodemailer from 'nodemailer';
@@ -32,8 +33,8 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     return { success: false, status: 'failed', error: 'Recipient domain has no valid mail servers (MX)' };
   }
 
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+  const user = process.env.EMAIL_USER?.trim();
+  const pass = process.env.EMAIL_PASS?.trim();
 
   // Simulation mode check: only simulate if credentials are missing or default
   if (!user || !pass || user.includes('example.com')) {
@@ -53,10 +54,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
       port: 587,
       secure: false, // TLS
       auth: {
-        user: user.trim(),
-        pass: pass.trim(),
+        user: user,
+        pass: pass,
       },
       tls: {
+        // Brevo sometimes requires this for certain environments
         rejectUnauthorized: false 
       }
     });
@@ -74,10 +76,10 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     console.error('SMTP Error:', error.message);
     
     let userFriendlyError = "Failed to send email.";
-    if (error.message.includes('Authentication failed') || error.message.includes('Invalid login')) {
-      userFriendlyError = "SMTP Auth Error: Your EMAIL_USER must be your Brevo login email. Check .env.";
+    if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
+      userFriendlyError = `SMTP Auth Error: The username/password was rejected. Check your EMAIL_USER in .env matches your Brevo login email.`;
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `Sender error: ${user} is not a verified sender in Brevo.`;
+      userFriendlyError = `Sender error: ${user} is not a verified sender in your Brevo dashboard.`;
     }
 
     return { 
