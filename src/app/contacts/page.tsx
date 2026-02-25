@@ -40,7 +40,8 @@ export default function ContactsPage() {
     );
   }, [user, db]);
 
-  const { data: contacts = [], isLoading } = useCollection<Contact>(contactsQuery);
+  const { data: contactsData, isLoading } = useCollection<Contact>(contactsQuery);
+  const contacts = contactsData || [];
 
   const handleDelete = (id: string) => {
     if (!user || !db) return;
@@ -48,7 +49,7 @@ export default function ContactsPage() {
     toast({ title: "Contact Removed", description: "The contact has been deleted from your database." });
   };
 
-  const filteredContacts = (contacts || []).filter(c => 
+  const filteredContacts = contacts.filter(c => 
     c.email.toLowerCase().includes(search.toLowerCase()) ||
     c.firstName.toLowerCase().includes(search.toLowerCase()) ||
     c.lastName.toLowerCase().includes(search.toLowerCase()) ||

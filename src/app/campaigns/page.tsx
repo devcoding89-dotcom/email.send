@@ -36,7 +36,8 @@ export default function CampaignsPage() {
     );
   }, [user, db]);
 
-  const { data: campaigns = [], isLoading } = useCollection<Campaign>(campaignsQuery);
+  const { data: campaignsData, isLoading } = useCollection<Campaign>(campaignsQuery);
+  const campaigns = campaignsData || [];
 
   const handleDelete = (id: string) => {
     if (!user || !db) return;

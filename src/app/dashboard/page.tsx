@@ -40,7 +40,8 @@ export default function Dashboard() {
     );
   }, [user, db]);
 
-  const { data: history = [], isLoading: isHistoryLoading } = useCollection<ParseRecord>(historyQuery);
+  const { data: historyData, isLoading: isHistoryLoading } = useCollection<ParseRecord>(historyQuery);
+  const history = historyData || [];
 
   const deleteRecord = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,7 +55,7 @@ export default function Dashboard() {
     }
   };
 
-  const filteredHistory = (history || []).filter(h => 
+  const filteredHistory = history.filter(h => 
     h.emails.some(e => e.toLowerCase().includes(search.toLowerCase())) ||
     h.text.toLowerCase().includes(search.toLowerCase())
   );
