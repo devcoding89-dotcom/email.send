@@ -35,12 +35,12 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const user = process.env.EMAIL_USER?.trim();
   const pass = process.env.EMAIL_PASS?.trim();
 
-  // Configuration check
-  if (!user || !pass || user.includes('example.com')) {
+  // Basic check for existence of credentials
+  if (!user || !pass) {
     return { 
       success: false, 
       status: 'failed',
-      error: 'SMTP Configuration Required: Please check your EMAIL_USER in the .env file.'
+      error: 'SMTP Configuration Missing: Please ensure EMAIL_USER and EMAIL_PASS are set in your .env file.'
     };
   }
 
@@ -49,11 +49,15 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     const transporter = nodemailer.createTransport({
       host: 'smtp-relay.brevo.com',
       port: 587,
-      secure: false, // TLS
+      secure: false, // TLS (use upgrade via STARTTLS)
       auth: {
         user: user,
         pass: pass,
       },
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+      }
     });
 
     // Send the email
@@ -73,7 +77,7 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     
     // Catch common authentication errors
     if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: Please ensure your Brevo email (${user}) and the SMTP key in your .env are correct. Note: Use the SMTP Key, not the API Key.`;
+      userFriendlyError = `Authentication Failed: Brevo rejected the credentials for ${user}. Please double-check your SMTP Key (Master Password) in Brevo Settings.`;
     } else if (error.message.includes('unauthorized sender')) {
       userFriendlyError = `Sender Error: The address ${user} must be a verified sender in your Brevo account dashboard.`;
     } else {
