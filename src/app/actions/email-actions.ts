@@ -7,7 +7,6 @@ import { promises as dns } from 'dns';
 
 /**
  * Checks if a domain has valid MX records.
- * This ensures the recipient domain is actually capable of receiving mail.
  */
 async function hasMXRecord(email: string): Promise<boolean> {
   const domain = email.split("@")[1];
@@ -21,7 +20,6 @@ async function hasMXRecord(email: string): Promise<boolean> {
 
 /**
  * Sends a personalized campaign email using Brevo SMTP.
- * Performs a multi-level validation check (Syntax + Domain MX) before transmission.
  */
 export async function sendCampaignEmail(to: string, subject: string, body: string) {
   // 1. Level 1: Syntax Validation
@@ -38,43 +36,31 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
 
-  // Simulation mode if credentials are still set to placeholders
-  if (!user || !pass || user === 'your-brevo-login-email@example.com' || user === 'your-brevo-email@example.com') {
-    console.log('SMTP Simulation Mode: Please set EMAIL_USER in .env to your real Brevo login email.');
+  // Simulation mode check
+  if (!user || !pass || user.includes('example.com')) {
+    console.log('SMTP Simulation Mode: Please set a valid EMAIL_USER in .env');
     await new Promise(resolve => setTimeout(resolve, 500));
     return { success: true, status: 'simulated' };
   }
 
   try {
-    // Configure for Brevo SMTP Relay
-    // Host: smtp-relay.brevo.com
-    // Port: 587 (TLS)
+    // Brevo SMTP Relay Configuration
     const transporter = nodemailer.createTransport({
       host: 'smtp-relay.brevo.com',
       port: 587,
-      secure: false, // Use STARTTLS
+      secure: false, // TLS
       auth: {
-        user: user, // Your Brevo account email
-        pass: pass, // Your Brevo SMTP API Key
+        user: user.trim(),
+        pass: pass.trim(),
       },
       tls: {
-        // Brevo requires modern TLS but sometimes fails on unauthorized certs in dev environments
+        // Essential for many cloud environments to prevent handshake errors
         rejectUnauthorized: false 
       }
     });
 
-    // Verify connection configuration immediately to catch "Invalid Login"
-    try {
-      await transporter.verify();
-    } catch (verifyError: any) {
-      console.error('SMTP Verification Failed:', verifyError.message);
-      return { 
-        success: false, 
-        status: 'failed', 
-        error: `Authentication Failed: Ensure EMAIL_USER in .env is your Brevo login email and the key is correct.` 
-      };
-    }
-
+    // Send the email
+    // IMPORTANT: The 'from' address must be a verified sender in your Brevo account
     await transporter.sendMail({
       from: `"Scoutier Outreach" <${user}>`,
       to,
@@ -84,7 +70,19 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
     return { success: true, status: 'sent' };
   } catch (error: any) {
-    console.error('SMTP Transmission error:', error.message);
-    return { success: false, status: 'failed', error: error.message || 'SMTP Transmission Error' };
+    console.error('SMTP Error:', error.message);
+    
+    let userFriendlyError = "Failed to send email.";
+    if (error.message.includes('Authentication failed') || error.message.includes('Invalid login')) {
+      userFriendlyError = "SMTP Authentication Failed: Please check your EMAIL_USER and EMAIL_PASS in the .env file. Ensure EMAIL_USER is your Brevo login email.";
+    } else if (error.message.includes('unauthorized sender')) {
+      userFriendlyError = `The email address ${user} is not a verified sender in your Brevo account.`;
+    }
+
+    return { 
+      success: false, 
+      status: 'failed', 
+      error: userFriendlyError 
+    };
   }
 }
