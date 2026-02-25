@@ -21,6 +21,21 @@ async function hasMXRecord(email: string): Promise<boolean> {
  * Sends a personalized campaign email using Brevo SMTP.
  */
 export async function sendCampaignEmail(to: string, subject: string, body: string) {
+  // Get credentials from environment
+  const user = process.env.EMAIL_USER?.trim();
+  const pass = process.env.EMAIL_PASS?.trim();
+  const senderEmail = process.env.SENDER_EMAIL?.trim() || user;
+
+  // Validate presence of keys
+  if (!user || !pass) {
+    console.error('SMTP ERROR: Missing credentials in .env');
+    return { 
+      success: false, 
+      status: 'failed',
+      error: 'SMTP Configuration Missing: Check EMAIL_USER and EMAIL_PASS in .env'
+    };
+  }
+
   // 1. Level 1: Syntax Validation
   if (!validateEmailFormat(to)) {
     return { success: false, status: 'failed', error: 'Invalid email syntax' };
@@ -32,35 +47,19 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     return { success: false, status: 'failed', error: 'Recipient domain has no valid mail servers (MX)' };
   }
 
-  const user = process.env.EMAIL_USER?.trim();
-  const pass = process.env.EMAIL_PASS?.trim();
-  const senderEmail = process.env.SENDER_EMAIL?.trim() || user;
-
-  if (!user || !pass) {
-    return { 
-      success: false, 
-      status: 'failed',
-      error: 'SMTP Configuration Missing: Check EMAIL_USER and EMAIL_PASS in .env'
-    };
-  }
-
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp-relay.brevo.com',
       port: 587,
-      secure: false, // TLS
+      secure: false, // Must be false for 587 (TLS upgrade)
       auth: {
         user: user,
         pass: pass,
       },
-      requireTLS: true,
       tls: {
         rejectUnauthorized: false
       }
     });
-
-    // Verify connection configuration
-    await transporter.verify();
 
     // Send the email
     await transporter.sendMail({
@@ -72,12 +71,12 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
     return { success: true, status: 'sent' };
   } catch (error: any) {
-    console.error('SMTP Error:', error.message);
+    console.error('SMTP Error Detail:', error.message);
     
     let userFriendlyError = "Failed to send email.";
     
     if (error.message.includes('Authentication failed') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: Brevo rejected Login ID: ${user}. Check your SMTP key.`;
+      userFriendlyError = `Authentication Failed: Brevo rejected your Login ID or Password.`;
     } else if (error.message.includes('unauthorized sender')) {
       userFriendlyError = `Sender Error: ${senderEmail} must be a verified sender in Brevo.`;
     } else {

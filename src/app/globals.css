@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  /* Deep Dark Theme as Default */
+  /* Solid Midnight Dark Theme - NO WHITE */
   --background: 224 71% 4%;
   --foreground: 213 31% 91%;
   
-  --card: 224 71% 4%;
+  --card: 224 71% 2%;
   --card-foreground: 213 31% 91%;
   
-  --popover: 224 71% 4%;
+  --popover: 224 71% 2%;
   --popover-foreground: 213 31% 91%;
   
   --primary: 263 70% 50%;
   --primary-foreground: 210 40% 98%;
   
-  --secondary: 222 47% 11%;
+  --secondary: 222 47% 10%;
   --secondary-foreground: 210 40% 98%;
   
-  --muted: 223 47% 11%;
+  --muted: 223 47% 10%;
   --muted-foreground: 215.4 16.3% 56.9%;
   
   --accent: 316 70% 50%;
@@ -28,11 +28,11 @@
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
   
-  --border: 216 34% 17%;
-  --input: 216 34% 17%;
+  --border: 216 34% 15%;
+  --input: 216 34% 15%;
   --ring: 263 70% 50%;
   
-  --radius: 1.25rem;
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -40,7 +40,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased selection:bg-primary/30;
+    @apply bg-background text-foreground font-body antialiased overflow-x-hidden;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline tracking-tight text-foreground;
@@ -51,22 +51,25 @@
   @apply bg-background border-b border-white/5;
 }
 
-.hero-gradient {
-  background: radial-gradient(circle at top left, hsl(var(--primary) / 0.1), transparent 70%),
-              radial-gradient(circle at bottom right, hsl(var(--accent) / 0.1), transparent 70%);
+/* Animations removed as requested */
+* {
+  animation: none !important;
+  transition: none !important;
 }
 
-.card-glow {
-  @apply transition-shadow duration-300 hover:shadow-[0_0_20px_-5px_rgba(118,80,229,0.2)];
+/* Ensure images don't overflow on mobile */
+img {
+  max-width: 100%;
+  height: auto;
 }
 
-/* Scrollbar styling for dark theme */
+/* Scrollbar styling for midnight theme */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   @apply bg-background;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted rounded-full;
+  @apply bg-muted;
 }
