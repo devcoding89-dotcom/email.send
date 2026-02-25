@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState } from "react";
-import { useUser, useFirestore } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
+import { useState, useEffect } from "react";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Type, Layers, Zap, Info, ArrowRight, Eye } from "lucide-react";
+import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2 } from "lucide-react";
+
+interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  company: string;
+}
 
 export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
@@ -24,9 +34,20 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [speed, setSpeed] = useState([10]);
-  const [step, setStep] = useState("content");
+  const [step, setStep] = useState<"content" | "audience" | "config">("content");
+  const [search, setSearch] = useState("");
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
 
-  const tokens = ["firstName", "lastName", "company", "position"];
+  // Fetch available contacts
+  const contactsQuery = useMemoFirebase(() => {
+    if (!user || !db) return null;
+    return query(collection(db, `users/${user.uid}/contacts`), orderBy("createdAt", "desc"));
+  }, [user, db]);
+
+  const { data: contactsData } = useCollection<Contact>(contactsQuery);
+  const contacts = contactsData || [];
+
+  const tokens = ["firstName", "lastName", "email", "company", "position"];
 
   const insertToken = (token: string) => {
     setBody(prev => prev + `{{${token}}}`);
@@ -39,6 +60,11 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
       return;
     }
 
+    if (selectedContactIds.length === 0) {
+      toast({ variant: "destructive", title: "No Audience", description: "Please select at least one contact for this campaign." });
+      return;
+    }
+
     addDocumentNonBlocking(collection(db, `users/${user.uid}/campaigns`), {
       userId: user.uid,
       name,
@@ -46,11 +72,12 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
       body,
       speed: speed[0],
       status: "draft",
-      stats: { total: 0, sent: 0, failed: 0 },
+      targetContactIds: selectedContactIds,
+      stats: { total: selectedContactIds.length, sent: 0, failed: 0 },
       createdAt: serverTimestamp(),
     });
 
-    toast({ title: "Campaign Saved", description: "Your outreach is ready. Launch it from the dashboard." });
+    toast({ title: "Campaign Saved", description: `Outreach designed for ${selectedContactIds.length} contacts.` });
     onOpenChange(false);
     reset();
   };
@@ -61,7 +88,29 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     setBody("");
     setSpeed([10]);
     setStep("content");
+    setSelectedContactIds([]);
   };
+
+  const toggleContact = (id: string) => {
+    setSelectedContactIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedContactIds.length === filteredContacts.length) {
+      setSelectedContactIds([]);
+    } else {
+      setSelectedContactIds(filteredContacts.map(c => c.id));
+    }
+  };
+
+  const filteredContacts = contacts.filter(c => 
+    c.email.toLowerCase().includes(search.toLowerCase()) ||
+    c.firstName.toLowerCase().includes(search.toLowerCase()) ||
+    c.lastName.toLowerCase().includes(search.toLowerCase()) ||
+    c.company.toLowerCase().includes(search.toLowerCase())
+  );
 
   const personalizedPreview = body
     .replace(/\{\{firstName\}\}/g, "John")
@@ -70,8 +119,8 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-[3rem] shadow-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-12 h-full">
+      <DialogContent className="max-w-5xl p-0 overflow-hidden border-none rounded-[3rem] shadow-2xl">
+        <div className="grid grid-cols-1 md:grid-cols-12 h-[80vh]">
           {/* Sidebar / Progress */}
           <div className="md:col-span-4 bg-muted/30 p-10 flex flex-col justify-between">
             <div className="space-y-12">
@@ -85,6 +134,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               <div className="space-y-8">
                 {[
                   { id: 'content', label: 'Message Design', icon: Type },
+                  { id: 'audience', label: 'Target Audience', icon: Users },
                   { id: 'config', label: 'Speed & Drip', icon: Layers }
                 ].map((s) => (
                   <div key={s.id} className={`flex items-center gap-4 transition-all ${step === s.id ? 'text-primary scale-105' : 'text-muted-foreground opacity-50'}`}>
@@ -97,93 +147,157 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               </div>
             </div>
             
-            <div className="p-6 bg-primary/5 rounded-[2rem] border border-primary/10">
-              <div className="flex items-start gap-3">
-                <Info className="h-4 w-4 text-primary mt-1" />
+            <div className="space-y-4">
+              <div className="p-6 bg-primary/5 rounded-[2rem] border border-primary/10">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className={`h-4 w-4 mt-1 ${selectedContactIds.length > 0 ? 'text-green-500' : 'text-muted-foreground'}`} />
+                  <p className="text-sm font-bold">
+                    {selectedContactIds.length} <span className="text-muted-foreground font-medium">Contacts Selected</span>
+                  </p>
+                </div>
+              </div>
+              <div className="p-6 bg-muted/50 rounded-[2rem]">
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  Tip: Emails using personalization tokens like <code className="text-primary">firstName</code> see 40% higher reply rates.
+                  Tip: Smaller, highly-targeted lists often perform 2x better than broad "blast" campaigns.
                 </p>
               </div>
             </div>
           </div>
 
           {/* Main Form */}
-          <div className="md:col-span-8 bg-card p-10">
-            <DialogHeader className="mb-10">
-              <DialogTitle className="text-4xl font-headline font-black">Outreach Architect</DialogTitle>
-              <DialogDescription className="text-lg">Design a campaign that feels human, at scale.</DialogDescription>
-            </DialogHeader>
+          <div className="md:col-span-8 bg-card p-10 flex flex-col">
+            <div className="flex-1 overflow-y-auto px-2">
+              <DialogHeader className="mb-10">
+                <DialogTitle className="text-4xl font-headline font-black">Outreach Architect</DialogTitle>
+                <DialogDescription className="text-lg">Step {step === 'content' ? '1' : step === 'audience' ? '2' : '3'}: {
+                  step === 'content' ? 'Define your message' : step === 'audience' ? 'Select your targets' : 'Configure delivery speed'
+                }</DialogDescription>
+              </DialogHeader>
 
-            {step === 'content' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Label</Label>
-                    <Input placeholder="e.g., Q1 Outreach" className="h-12 rounded-xl" value={name} onChange={e => setName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Email Subject</Label>
-                    <Input placeholder="Check this out, {{firstName}}!" className="h-12 rounded-xl" value={subject} onChange={e => setSubject(e.target.value)} />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Message Body</Label>
-                    <div className="flex gap-1.5">
-                      {tokens.map(t => (
-                        <Badge key={t} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all rounded-lg py-1 text-[10px]" onClick={() => insertToken(t)}>
-                          +{t}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <Textarea 
-                    placeholder="Hi {{firstName}}, I noticed {{company}}..." 
-                    className="min-h-[250px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {step === 'config' && (
-              <div className="space-y-12 animate-in fade-in slide-in-from-right-8 duration-500">
-                <div className="space-y-6">
-                  <div className="flex justify-between items-end">
+              {step === 'content' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sending Velocity</Label>
-                      <p className="text-muted-foreground text-sm">Control how fast your outreach is dispatched.</p>
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Label</Label>
+                      <Input placeholder="e.g., Q1 Outreach" className="h-12 rounded-xl" value={name} onChange={e => setName(e.target.value)} />
                     </div>
-                    <span className="text-3xl font-black font-headline text-primary">{speed[0]} <small className="text-xs uppercase">EPM</small></span>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Email Subject</Label>
+                      <Input placeholder="Check this out, {{firstName}}!" className="h-12 rounded-xl" value={subject} onChange={e => setSubject(e.target.value)} />
+                    </div>
                   </div>
-                  <Slider value={speed} onValueChange={setSpeed} max={100} min={1} step={1} className="py-4" />
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    <span>Precision Drip</span>
-                    <span>High Volume</span>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Message Body</Label>
+                      <div className="flex gap-1.5">
+                        {tokens.map(t => (
+                          <Badge key={t} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all rounded-lg py-1 text-[10px]" onClick={() => insertToken(t)}>
+                            +{t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Textarea 
+                      placeholder="Hi {{firstName}}, I noticed {{company}}..." 
+                      className="min-h-[200px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
+                      value={body}
+                      onChange={e => setBody(e.target.value)}
+                    />
                   </div>
                 </div>
+              )}
 
-                <div className="p-8 rounded-[2.5rem] bg-accent/5 border border-accent/10 space-y-4">
-                  <h4 className="font-bold flex items-center gap-2 text-accent uppercase text-xs tracking-widest">
-                    <Eye className="h-4 w-4" />
-                    Personalization Preview
-                  </h4>
-                  <div className="bg-background/50 p-6 rounded-2xl border border-accent/10 text-sm font-medium leading-relaxed italic text-muted-foreground">
-                    {body ? (
-                      personalizedPreview.split('\n').map((line, i) => <p key={i}>{line}</p>)
-                    ) : (
-                      "Start typing your message to see a personalized preview here."
-                    )}
+              {step === 'audience' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 h-full flex flex-col">
+                  <div className="relative">
+                    <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search vault contacts..." 
+                      className="pl-12 h-12 rounded-xl" 
+                      value={search} 
+                      onChange={e => setSearch(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="select-all" checked={selectedContactIds.length === filteredContacts.length && filteredContacts.length > 0} onCheckedChange={toggleAll} />
+                      <Label htmlFor="select-all" className="text-sm font-bold cursor-pointer">Select All Visible</Label>
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground">{selectedContactIds.length} / {contacts.length} Selected</span>
+                  </div>
+
+                  <ScrollArea className="flex-1 min-h-[300px] border rounded-3xl bg-muted/20">
+                    <div className="p-4 space-y-2">
+                      {filteredContacts.length > 0 ? (
+                        filteredContacts.map((contact) => (
+                          <div 
+                            key={contact.id} 
+                            className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${selectedContactIds.includes(contact.id) ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-muted/50'}`}
+                            onClick={() => toggleContact(contact.id)}
+                          >
+                            <div className="flex items-center gap-4">
+                              <Checkbox checked={selectedContactIds.includes(contact.id)} />
+                              <div>
+                                <p className="font-bold text-sm">{contact.firstName} {contact.lastName}</p>
+                                <p className="text-xs text-muted-foreground">{contact.email}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-[10px]">{contact.company || 'Private'}</Badge>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-20">
+                          <Users className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+                          <p className="text-muted-foreground font-medium">No contacts found in vault.</p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {step === 'config' && (
+                <div className="space-y-12 animate-in fade-in slide-in-from-right-8 duration-500">
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-end">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sending Velocity</Label>
+                        <p className="text-muted-foreground text-sm">Control how fast your outreach is dispatched.</p>
+                      </div>
+                      <span className="text-3xl font-black font-headline text-primary">{speed[0]} <small className="text-xs uppercase">EPM</small></span>
+                    </div>
+                    <Slider value={speed} onValueChange={setSpeed} max={100} min={1} step={1} className="py-4" />
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      <span>Precision Drip</span>
+                      <span>High Volume</span>
+                    </div>
+                  </div>
+
+                  <div className="p-8 rounded-[2.5rem] bg-accent/5 border border-accent/10 space-y-4">
+                    <h4 className="font-bold flex items-center gap-2 text-accent uppercase text-xs tracking-widest">
+                      <Eye className="h-4 w-4" />
+                      Personalization Preview
+                    </h4>
+                    <div className="bg-background/50 p-6 rounded-2xl border border-accent/10 text-sm font-medium leading-relaxed italic text-muted-foreground">
+                      {body ? (
+                        personalizedPreview.split('\n').map((line, i) => <p key={i}>{line}</p>)
+                      ) : (
+                        "Start typing your message to see a personalized preview here."
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            <DialogFooter className="mt-12 flex items-center justify-between sm:justify-between w-full">
+            <DialogFooter className="mt-8 flex items-center justify-between sm:justify-between w-full border-t pt-8">
               {step !== 'content' ? (
-                <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setStep('content')}>
-                  Back to Design
+                <Button variant="ghost" className="rounded-xl font-bold" onClick={() => {
+                  if (step === 'audience') setStep('content');
+                  if (step === 'config') setStep('audience');
+                }}>
+                  Back
                 </Button>
               ) : (
                 <div />
@@ -192,13 +306,18 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               <div className="flex gap-4">
                 <Button variant="outline" className="rounded-xl font-bold h-12" onClick={() => onOpenChange(false)}>Cancel</Button>
                 {step === 'content' ? (
+                  <Button className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20" onClick={() => setStep('audience')}>
+                    Select Audience
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : step === 'audience' ? (
                   <Button className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20" onClick={() => setStep('config')}>
                     Configure Drip
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
                   <Button className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20" onClick={handleCreate}>
-                    Finalize & Save
+                    Finalize & Launch
                   </Button>
                 )}
               </div>

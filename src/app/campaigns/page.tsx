@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, serverTimestamp, doc, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ interface Campaign {
   body: string;
   status: "draft" | "scheduled" | "sending" | "completed" | "paused";
   speed: number;
+  targetContactIds?: string[];
   stats?: { total: number, sent: number, failed: number };
   createdAt: any;
   userId: string;
@@ -64,7 +65,7 @@ export default function CampaignsPage() {
 
     toast({ 
       title: newStatus === 'sending' ? "Outreach Started" : "Outreach Paused",
-      description: newStatus === 'sending' ? "Processing your verified contacts." : "The drip feed has been halted."
+      description: newStatus === 'sending' ? "Processing your targeted contacts." : "The drip feed has been halted."
     });
   };
 
@@ -77,14 +78,10 @@ export default function CampaignsPage() {
 
     const interval = setInterval(async () => {
       for (const campaign of activeCampaigns) {
-        // 1. Fetch contacts from the vault
-        const contactsRef = collection(db, `users/${user.uid}/contacts`);
-        const contactsSnap = await getDocs(query(contactsRef));
-        const totalContacts = contactsSnap.size;
-
-        if (totalContacts === 0) {
-          updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'paused' });
-          toast({ variant: "destructive", title: "Empty Vault", description: `Campaign "${campaign.name}" paused. Add contacts to continue.` });
+        // 1. Fetch targeted contacts
+        const targetIds = campaign.targetContactIds || [];
+        if (targetIds.length === 0) {
+          updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
           continue;
         }
 
@@ -92,25 +89,32 @@ export default function CampaignsPage() {
         const currentFailed = campaign.stats?.failed || 0;
         
         // 2. Determine batch size based on EPM (Emails Per Minute)
-        // Interval is 10s, so batch = speed / 6
         const batchSize = Math.max(1, Math.ceil(campaign.speed / 6));
-        const nextBatchEnd = Math.min(totalContacts, currentSent + batchSize);
+        const nextBatchEndIndex = Math.min(targetIds.length, currentSent + currentFailed + batchSize);
 
-        if (currentSent >= totalContacts) {
+        if (currentSent + currentFailed >= targetIds.length) {
           updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
           continue;
         }
 
-        // 3. Process Batch: Personalize & Dispatch
+        // 3. Process Batch
         let successfulSends = 0;
         let failedSends = 0;
 
-        for (let i = currentSent; i < nextBatchEnd; i++) {
-          const contact = contactsSnap.docs[i].data();
+        for (let i = (currentSent + currentFailed); i < nextBatchEndIndex; i++) {
+          const contactId = targetIds[i];
+          const contactRef = doc(db, `users/${user.uid}/contacts`, contactId);
+          const contactSnap = await getDoc(contactRef);
+          
+          if (!contactSnap.exists()) {
+            failedSends++;
+            continue;
+          }
+
+          const contact = contactSnap.data();
           const personalizedBody = personalizeTemplate(campaign.body, contact);
           const personalizedSubject = personalizeTemplate(campaign.subject, contact);
 
-          // Trigger Server Action for sending
           const result = await sendCampaignEmail(contact.email, personalizedSubject, personalizedBody);
 
           if (result.success) {
@@ -119,26 +123,23 @@ export default function CampaignsPage() {
             failedSends++;
           }
 
-          // Log transaction
           addDocumentNonBlocking(collection(db, `users/${user.uid}/campaigns/${campaign.id}/logs`), {
             userId: user.uid,
             campaignId: campaign.id,
             contactEmail: contact.email,
             status: result.success ? 'sent' : 'failed',
             errorMessage: result.error || null,
-            simulated: result.status === 'simulated',
             timestamp: serverTimestamp()
           });
         }
 
-        // 4. Update Campaign Cumulative Stats
         updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), {
           "stats.sent": currentSent + successfulSends,
           "stats.failed": currentFailed + failedSends,
-          "stats.total": totalContacts
+          "stats.total": targetIds.length
         });
       }
-    }, 10000); // Check and send every 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [campaigns, user, db]);
@@ -152,7 +153,7 @@ export default function CampaignsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold font-headline">Campaign Center</h1>
-            <p className="text-xl text-muted-foreground">Orchestrate your automated outreach with precision drip feeds.</p>
+            <p className="text-xl text-muted-foreground">Orchestrate your automated outreach with targeted precision.</p>
           </div>
           <Button onClick={() => setShowCreate(true)} size="lg" className="h-16 px-8 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20">
             <Plus className="mr-2 h-6 w-6" />
@@ -169,7 +170,10 @@ export default function CampaignsPage() {
         ) : campaigns.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {campaigns.map((campaign) => {
-              const progress = campaign.stats?.total ? (campaign.stats.sent / campaign.stats.total) * 100 : 0;
+              const total = campaign.targetContactIds?.length || campaign.stats?.total || 0;
+              const sent = campaign.stats?.sent || 0;
+              const progress = total > 0 ? (sent / total) * 100 : 0;
+              
               return (
                 <Card key={campaign.id} className={`group relative border-border/50 shadow-xl rounded-[2.5rem] overflow-hidden transition-all duration-300 ${campaign.status === 'sending' ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/50'}`}>
                   <CardHeader className="pb-4">
@@ -193,20 +197,18 @@ export default function CampaignsPage() {
                     <CardDescription className="line-clamp-1 italic">"{campaign.subject}"</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {(campaign.status !== 'draft' && campaign.stats) && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                          <span>Progress</span>
-                          <span>{Math.round(progress)}%</span>
-                        </div>
-                        <Progress value={progress} className="h-2 rounded-full" />
-                        <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                          <span className="text-green-600 font-bold">{campaign.stats.sent} Sent</span>
-                          {campaign.stats.failed > 0 && <span className="text-destructive font-bold">{campaign.stats.failed} Failed</span>}
-                          <span>{campaign.stats.total} Total</span>
-                        </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                        <span>Progress</span>
+                        <span>{Math.round(progress)}%</span>
                       </div>
-                    )}
+                      <Progress value={progress} className="h-2 rounded-full" />
+                      <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
+                        <span className="text-green-600 font-bold">{sent} Sent</span>
+                        {campaign.stats?.failed > 0 && <span className="text-destructive font-bold">{campaign.stats.failed} Failed</span>}
+                        <span>{total} Contacts</span>
+                      </div>
+                    </div>
                     
                     <div className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
                       <div className="flex items-center gap-2">
@@ -238,7 +240,7 @@ export default function CampaignsPage() {
             <Send className="h-20 w-20 text-muted-foreground/20 mb-8" />
             <h3 className="text-3xl font-bold font-headline mb-4">No Campaigns Found</h3>
             <p className="text-muted-foreground text-lg mb-8 max-w-md text-center">
-              Ready to start your first scout-led outreach? Define your message and target your vault.
+              Define your message and hand-pick your audience to start your first campaign.
             </p>
             <Button size="lg" className="rounded-2xl" onClick={() => setShowCreate(true)}>
               Launch First Campaign
