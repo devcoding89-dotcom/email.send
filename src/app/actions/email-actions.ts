@@ -37,12 +37,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const pass = process.env.EMAIL_PASS?.trim();
 
   // Simulation mode check: only simulate if credentials are missing or default
-  if (!user || !pass || user.includes('example.com')) {
-    console.log('SMTP Config Missing: Please set your real Brevo email in .env');
+  if (!user || !pass || user.includes('example.com') || user.includes('HERE.COM')) {
     return { 
       success: false, 
       status: 'failed',
-      error: 'SMTP Configuration Missing: Set your real Brevo email in the .env file.'
+      error: 'SMTP Configuration Incomplete: You must replace "YOUR_REAL_BREVO_EMAIL@HERE.COM" in the .env file with your actual Brevo login email.'
     };
   }
 
@@ -78,7 +77,7 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     
     // Catch common authentication errors
     if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: The username (${user}) or SMTP key was rejected by Brevo. Ensure EMAIL_USER is your exact Brevo login email.`;
+      userFriendlyError = `Authentication Failed: Brevo rejected the login "${user}". Please ensure this is the exact email address for your Brevo account.`;
     } else if (error.message.includes('unauthorized sender')) {
       userFriendlyError = `Sender Error: The address ${user} is not a verified sender in your Brevo account.`;
     } else if (error.code === 'ETIMEDOUT') {
