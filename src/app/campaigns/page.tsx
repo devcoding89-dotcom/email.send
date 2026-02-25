@@ -1,24 +1,29 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, serverTimestamp, doc, updateDoc, getDocs, limit } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Send, Clock, Play, Trash2, Edit3, MoreVertical, LayoutGrid, AlertCircle } from "lucide-react";
+import { Plus, Send, Clock, Play, Trash2, Edit3, Pause, BarChart3, AlertCircle, CheckCircle2 } from "lucide-react";
 import { CreateCampaignDialog } from "@/components/campaigns/CreateCampaignDialog";
+import { CampaignStatsDialog } from "@/components/campaigns/CampaignStatsDialog";
 import { format } from "date-fns";
-import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { doc } from "firebase/firestore";
+import { deleteDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { personalizeTemplate } from "@/lib/extractor";
 
 interface Campaign {
   id: string;
   name: string;
   subject: string;
-  status: "draft" | "scheduled" | "sending" | "completed";
+  body: string;
+  status: "draft" | "scheduled" | "sending" | "completed" | "paused";
+  speed: number;
+  stats?: { total: number, sent: number, failed: number };
   createdAt: any;
   scheduledAt?: any;
 }
@@ -26,7 +31,9 @@ interface Campaign {
 export default function CampaignsPage() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
+  const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
   const campaignsQuery = useMemoFirebase(() => {
     if (!user || !db) return null;
@@ -42,7 +49,70 @@ export default function CampaignsPage() {
   const handleDelete = (id: string) => {
     if (!user || !db) return;
     deleteDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, id));
+    toast({ title: "Campaign Deleted" });
   };
+
+  const toggleStatus = async (campaign: Campaign) => {
+    if (!user || !db) return;
+    const newStatus = campaign.status === 'sending' ? 'paused' : 'sending';
+    
+    updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), {
+      status: newStatus
+    });
+
+    toast({ 
+      title: newStatus === 'sending' ? "Outreach Started" : "Outreach Paused",
+      description: newStatus === 'sending' ? "We're processing your contacts now." : "The drip feed has been halted."
+    });
+  };
+
+  // Simulated Campaign Runner
+  useEffect(() => {
+    if (!user || !db || campaigns.length === 0) return;
+
+    const activeCampaigns = campaigns.filter(c => c.status === 'sending');
+    if (activeCampaigns.length === 0) return;
+
+    const interval = setInterval(async () => {
+      for (const campaign of activeCampaigns) {
+        // Fetch a few contacts to "send" to
+        const contactsRef = collection(db, `users/${user.uid}/contacts`);
+        const contactsSnap = await getDocs(query(contactsRef, limit(Math.ceil(campaign.speed / 60))));
+        
+        if (contactsSnap.empty) {
+          updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
+          continue;
+        }
+
+        const currentSent = campaign.stats?.sent || 0;
+        const currentTotal = campaign.stats?.total || contactsSnap.size * 10; // Mock total if not set
+        
+        if (currentSent >= currentTotal) {
+          updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
+          continue;
+        }
+
+        const batchSize = Math.max(1, Math.floor(campaign.speed / 10)); // simulated spread
+        const newSentCount = Math.min(currentTotal, currentSent + batchSize);
+
+        updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), {
+          "stats.sent": newSentCount,
+          "stats.total": currentTotal
+        });
+
+        // Log a simulated success
+        addDocumentNonBlocking(collection(db, `users/${user.uid}/campaigns/${campaign.id}/logs`), {
+          userId: user.uid,
+          campaignId: campaign.id,
+          contactEmail: `scouted_lead_${newSentCount}@example.com`,
+          status: 'sent',
+          timestamp: serverTimestamp()
+        });
+      }
+    }, 5000); // Check every 5s for progress
+
+    return () => clearInterval(interval);
+  }, [campaigns, user, db]);
 
   if (isUserLoading) return null;
 
@@ -57,7 +127,7 @@ export default function CampaignsPage() {
           </div>
           <Button onClick={() => setShowCreate(true)} size="lg" className="h-16 px-8 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20">
             <Plus className="mr-2 h-6 w-6" />
-            Create Campaign
+            New Campaign
           </Button>
         </div>
 
@@ -69,42 +139,69 @@ export default function CampaignsPage() {
           </div>
         ) : campaigns.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {campaigns.map((campaign) => (
-              <Card key={campaign.id} className="group relative border-border/50 shadow-xl rounded-[2.5rem] overflow-hidden hover:border-primary/50 transition-all duration-300">
-                <CardHeader className="pb-4">
-                  <div className="flex justify-between items-start mb-4">
-                    <Badge variant={campaign.status === 'draft' ? 'secondary' : 'default'} className="rounded-full px-4 py-1 font-bold">
-                      {campaign.status.toUpperCase()}
-                    </Badge>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => handleDelete(campaign.id)}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+            {campaigns.map((campaign) => {
+              const progress = campaign.stats ? (campaign.stats.sent / campaign.stats.total) * 100 : 0;
+              return (
+                <Card key={campaign.id} className={`group relative border-border/50 shadow-xl rounded-[2.5rem] overflow-hidden transition-all duration-300 ${campaign.status === 'sending' ? 'border-primary shadow-primary/10' : 'hover:border-primary/50'}`}>
+                  <CardHeader className="pb-4">
+                    <div className="flex justify-between items-start mb-4">
+                      <Badge 
+                        variant={campaign.status === 'completed' ? 'default' : campaign.status === 'sending' ? 'default' : 'secondary'} 
+                        className={`rounded-full px-4 py-1 font-bold ${campaign.status === 'sending' ? 'bg-primary animate-pulse' : ''}`}
+                      >
+                        {campaign.status.toUpperCase()}
+                      </Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setSelectedCampaign(campaign)}>
+                          <BarChart3 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="rounded-xl hover:text-destructive" onClick={() => handleDelete(campaign.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <CardTitle className="text-2xl font-headline font-black mb-1">{campaign.name}</CardTitle>
+                    <CardDescription className="line-clamp-1 italic">"{campaign.subject}"</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {campaign.status !== 'draft' && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                          <span>Progress</span>
+                          <span>{Math.round(progress)}%</span>
+                        </div>
+                        <Progress value={progress} className="h-2 rounded-full" />
+                        <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
+                          <span>{campaign.stats?.sent || 0} Sent</span>
+                          <span>{campaign.stats?.total || 0} Total</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {campaign.createdAt ? format(campaign.createdAt.toDate(), "MMM d, yyyy") : "..."}
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button 
+                        variant={campaign.status === 'sending' ? 'outline' : 'default'} 
+                        className="flex-1 rounded-xl h-12 font-bold shadow-lg"
+                        onClick={() => toggleStatus(campaign)}
+                        disabled={campaign.status === 'completed'}
+                      >
+                        {campaign.status === 'sending' ? (
+                          <><Pause className="mr-2 h-4 w-4" /> Pause</>
+                        ) : (
+                          <><Play className="mr-2 h-4 w-4" /> {campaign.status === 'completed' ? 'Finished' : 'Start'}</>
+                        )}
                       </Button>
                     </div>
-                  </div>
-                  <CardTitle className="text-2xl font-headline font-black mb-2">{campaign.name}</CardTitle>
-                  <CardDescription className="line-clamp-1">{campaign.subject}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4 text-sm font-medium text-muted-foreground mb-8">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      {campaign.createdAt ? format(campaign.createdAt.toDate(), "MMM d, yyyy") : "..."}
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button variant="secondary" className="flex-1 rounded-xl h-12 font-bold">
-                      <Edit3 className="mr-2 h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button className="flex-1 rounded-xl h-12 font-bold shadow-lg shadow-primary/10">
-                      <Play className="mr-2 h-4 w-4" />
-                      Start
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center p-20 border-2 border-dashed rounded-[3rem] bg-muted/20">
@@ -121,6 +218,13 @@ export default function CampaignsPage() {
       </main>
 
       <CreateCampaignDialog open={showCreate} onOpenChange={setShowCreate} />
+      {selectedCampaign && (
+        <CampaignStatsDialog 
+          campaign={selectedCampaign} 
+          open={!!selectedCampaign} 
+          onOpenChange={(open) => !open && setSelectedCampaign(null)} 
+        />
+      )}
     </div>
   );
 }

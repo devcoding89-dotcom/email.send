@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -10,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Download, Sparkles, Trash2, Mail, Users, Building, DownloadCloud, Loader2, Share2, Info } from "lucide-react";
+import { Copy, Download, Sparkles, Trash2, Mail, Users, Building, DownloadCloud, Loader2, Share2, Info, UserPlus } from "lucide-react";
 import { generateCSV, downloadFile } from "@/lib/extractor";
-import { collection, serverTimestamp } from "firebase/firestore";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -76,6 +75,20 @@ export function ScoutView() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveToContacts = (email: string) => {
+    if (!user || !db) return;
+    addDocumentNonBlocking(collection(db, `users/${user.uid}/contacts`), {
+      userId: user.uid,
+      email,
+      firstName: email.split('@')[0],
+      lastName: "Scouted",
+      company: "Unknown",
+      position: "Lead",
+      createdAt: serverTimestamp()
+    });
+    toast({ title: "Contact Saved", description: `${email} added to your vault.` });
   };
 
   const clear = () => {
@@ -196,8 +209,11 @@ export function ScoutView() {
                 <div className="flex flex-wrap gap-2.5 mt-2">
                   {result.emails.length > 0 ? (
                     result.emails.map((email, idx) => (
-                      <Badge key={idx} variant="secondary" className="px-5 py-2 text-sm font-bold bg-primary/10 text-primary border-primary/20 rounded-xl hover:bg-primary/20 transition-all cursor-default">
+                      <Badge key={idx} variant="secondary" className="group px-5 py-2 text-sm font-bold bg-primary/10 text-primary border-primary/20 rounded-xl hover:bg-primary/20 transition-all cursor-default flex items-center gap-2">
                         {email}
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => saveToContacts(email)}>
+                          <UserPlus className="h-3 w-3" />
+                        </Button>
                       </Badge>
                     ))
                   ) : (
