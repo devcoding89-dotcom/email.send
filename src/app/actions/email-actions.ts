@@ -38,12 +38,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
   // Simulation mode check: only simulate if credentials are missing or default
   if (!user || !pass || user.includes('example.com')) {
-    console.log('SMTP Simulation Mode: Please set your real Brevo email in .env');
-    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log('SMTP Config Missing: Please set your real Brevo email in .env');
     return { 
-      success: true, 
-      status: 'simulated',
-      message: 'Email simulated. Update .env with your real Brevo email to send for real.'
+      success: false, 
+      status: 'failed',
+      error: 'SMTP Configuration Missing: Set your real Brevo email in the .env file.'
     };
   }
 
@@ -57,8 +56,8 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         user: user,
         pass: pass,
       },
+      // Some environments need to bypass certificate validation for specific relay ports
       tls: {
-        // Brevo sometimes requires this for certain environments
         rejectUnauthorized: false 
       }
     });
@@ -76,10 +75,14 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     console.error('SMTP Error:', error.message);
     
     let userFriendlyError = "Failed to send email.";
+    
+    // Catch common authentication errors
     if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
-      userFriendlyError = `SMTP Auth Error: The username/password was rejected. Check your EMAIL_USER in .env matches your Brevo login email.`;
+      userFriendlyError = `Authentication Failed: The username (${user}) or SMTP key was rejected by Brevo. Ensure EMAIL_USER is your exact Brevo login email.`;
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `Sender error: ${user} is not a verified sender in your Brevo dashboard.`;
+      userFriendlyError = `Sender Error: The address ${user} is not a verified sender in your Brevo account.`;
+    } else if (error.code === 'ETIMEDOUT') {
+      userFriendlyError = "Connection Timeout: Could not reach Brevo SMTP servers.";
     }
 
     return { 
