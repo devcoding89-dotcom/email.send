@@ -37,11 +37,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const pass = process.env.EMAIL_PASS?.trim();
 
   // Simulation mode check: only simulate if credentials are missing or default
-  if (!user || !pass || user.includes('example.com') || user.includes('HERE.COM')) {
+  if (!user || !pass || user.includes('REPLACE_WITH_YOUR_BREVO_EMAIL') || user === 'your-brevo-email@example.com') {
     return { 
       success: false, 
       status: 'failed',
-      error: 'SMTP Configuration Incomplete: You must replace "YOUR_REAL_BREVO_EMAIL@HERE.COM" in the .env file with your actual Brevo login email.'
+      error: 'SMTP Configuration Missing: Please open the .env file in the left sidebar and replace "REPLACE_WITH_YOUR_BREVO_EMAIL" with your actual Brevo login email.'
     };
   }
 
@@ -55,7 +55,6 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         user: user,
         pass: pass,
       },
-      // Some environments need to bypass certificate validation for specific relay ports
       tls: {
         rejectUnauthorized: false 
       }
