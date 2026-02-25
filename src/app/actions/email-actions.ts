@@ -1,4 +1,3 @@
-
 'use server';
 
 import nodemailer from 'nodemailer';
@@ -36,12 +35,12 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const user = process.env.EMAIL_USER?.trim();
   const pass = process.env.EMAIL_PASS?.trim();
 
-  // Configuration check: Ensure the user has replaced the placeholder
-  if (!user || !pass || user.includes('REPLACE_WITH_YOUR_BREVO_EMAIL') || user === 'your-brevo-email@example.com') {
+  // Configuration check
+  if (!user || !pass || user === 'your-brevo-email@example.com' || user.includes('REPLACE')) {
     return { 
       success: false, 
       status: 'failed',
-      error: 'SMTP Configuration Required: Please open the .env file in the left sidebar and replace "REPLACE_WITH_YOUR_BREVO_EMAIL" with your actual Brevo account email address.'
+      error: 'SMTP Configuration Required: Please update your credentials in the .env file.'
     };
   }
 
@@ -56,6 +55,7 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         pass: pass,
       },
       tls: {
+        // Brevo requires TLS, this ensures connection stability
         rejectUnauthorized: false 
       }
     });
@@ -76,11 +76,13 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     
     // Catch common authentication errors
     if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: Brevo rejected the login "${user}". Please ensure this is the exact email address for your Brevo account.`;
+      userFriendlyError = `Authentication Failed: Please ensure your Brevo email (${user}) and SMTP key are correct in the .env file.`;
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `Sender Error: The address ${user} is not a verified sender in your Brevo account.`;
+      userFriendlyError = `Sender Error: The address ${user} must be a verified sender in your Brevo account.`;
     } else if (error.code === 'ETIMEDOUT') {
       userFriendlyError = "Connection Timeout: Could not reach Brevo SMTP servers.";
+    } else {
+      userFriendlyError = `SMTP Error: ${error.message}`;
     }
 
     return { 
