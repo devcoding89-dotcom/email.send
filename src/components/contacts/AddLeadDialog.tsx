@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Mail, Building, Briefcase } from "lucide-react";
+import { UserPlus, Mail, Building, Briefcase, Loader2 } from "lucide-react";
 
 export function AddLeadDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
@@ -25,7 +25,7 @@ export function AddLeadDialog({ open, onOpenChange }: { open: boolean, onOpenCha
     position: ""
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!user || !db) return;
     if (!formData.email) {
       toast({ variant: "destructive", title: "Email Required", description: "Please provide at least an email address." });
@@ -33,16 +33,21 @@ export function AddLeadDialog({ open, onOpenChange }: { open: boolean, onOpenCha
     }
 
     setLoading(true);
-    addDocumentNonBlocking(collection(db, `users/${user.uid}/contacts`), {
-      ...formData,
-      userId: user.uid,
-      createdAt: serverTimestamp()
-    });
+    try {
+      addDocumentNonBlocking(collection(db, `users/${user.uid}/contacts`), {
+        ...formData,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
 
-    toast({ title: "Lead Added", description: `${formData.email} has been saved to your vault.` });
-    setFormData({ firstName: "", lastName: "", email: "", company: "", position: "" });
-    onOpenChange(false);
-    setLoading(false);
+      toast({ title: "Lead Added", description: `${formData.email} has been saved to your vault.` });
+      setFormData({ firstName: "", lastName: "", email: "", company: "", position: "" });
+      onOpenChange(false);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Could not save lead. Please try again." });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -124,9 +129,9 @@ export function AddLeadDialog({ open, onOpenChange }: { open: boolean, onOpenCha
         </div>
 
         <DialogFooter className="p-6 bg-muted/30 border-t rounded-b-[2.5rem]">
-          <Button variant="ghost" className="rounded-xl font-bold" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" className="rounded-xl font-bold" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
           <Button className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20" onClick={handleAdd} disabled={loading}>
-            Save to Vault
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save to Vault"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2, MailPlus } from "lucide-react";
+import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2, MailPlus, Loader2 } from "lucide-react";
 import { extractEmails } from "@/lib/extractor";
 
 interface Contact {
@@ -125,7 +125,6 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     const newContactIds: string[] = [];
     
     for (const email of emails) {
-      // Check if contact already exists in vault
       const existing = contacts.find(c => c.email.toLowerCase() === email.toLowerCase());
       if (existing) {
         if (!selectedContactIds.includes(existing.id)) {
@@ -134,7 +133,6 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
         continue;
       }
 
-      // Create new contact
       try {
         const docRef = await addDoc(collection(db, `users/${user.uid}/contacts`), {
           userId: user.uid,
@@ -171,10 +169,10 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl p-0 overflow-hidden border-none rounded-[3rem] shadow-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-12 h-[85vh]">
+      <DialogContent className="max-w-5xl p-0 overflow-hidden border-none rounded-[3rem] shadow-2xl h-[90vh]">
+        <div className="grid grid-cols-1 md:grid-cols-12 h-full">
           {/* Sidebar / Progress */}
-          <div className="md:col-span-4 bg-muted/30 p-10 flex flex-col justify-between">
+          <div className="md:col-span-4 bg-muted/30 p-10 flex flex-col justify-between border-r">
             <div className="space-y-12">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary rounded-xl">
@@ -210,20 +208,22 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               </div>
               <div className="p-6 bg-muted/50 rounded-[2rem]">
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  Tip: Direct entry allows you to quickly add emails without leaving the architect.
+                  Tip: Target specific leads from your vault or type in new ones directly.
                 </p>
               </div>
             </div>
           </div>
 
           {/* Main Form */}
-          <div className="md:col-span-8 bg-card p-10 flex flex-col">
-            <div className="flex-1 overflow-y-auto px-2">
+          <div className="md:col-span-8 bg-card flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-10">
               <DialogHeader className="mb-10">
                 <DialogTitle className="text-4xl font-headline font-black">Outreach Architect</DialogTitle>
-                <DialogDescription className="text-lg">Step {step === 'content' ? '1' : step === 'audience' ? '2' : '3'}: {
-                  step === 'content' ? 'Define your message' : step === 'audience' ? 'Select your targets' : 'Configure delivery speed'
-                }</DialogDescription>
+                <DialogDescription className="text-lg">
+                  {step === 'content' ? 'Define your outreach message template.' : 
+                   step === 'audience' ? 'Select or add your target recipients.' : 
+                   'Configure delivery speed and preview.'}
+                </DialogDescription>
               </DialogHeader>
 
               {step === 'content' && (
@@ -251,7 +251,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                     </div>
                     <Textarea 
                       placeholder="Hi {{firstName}}, I noticed {{company}}..." 
-                      className="min-h-[200px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
+                      className="min-h-[250px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
                       value={body}
                       onChange={e => setBody(e.target.value)}
                     />
@@ -261,8 +261,8 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
 
               {step === 'audience' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 h-full flex flex-col">
-                  <Tabs defaultValue="vault" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 h-14 bg-muted/50 rounded-2xl p-1 mb-8">
+                  <Tabs defaultValue="vault" className="w-full flex flex-col h-full">
+                    <TabsList className="grid w-full grid-cols-2 h-14 bg-muted/50 rounded-2xl p-1 mb-6">
                       <TabsTrigger value="vault" className="rounded-xl font-bold gap-2">
                         <Users className="h-4 w-4" />
                         Vault Leads
@@ -273,7 +273,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                       </TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="vault" className="space-y-6">
+                    <TabsContent value="vault" className="space-y-6 flex-1">
                       <div className="relative">
                         <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
                         <Input 
@@ -289,10 +289,10 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                           <Checkbox id="select-all" checked={selectedContactIds.length === filteredContacts.length && filteredContacts.length > 0} onCheckedChange={toggleAll} />
                           <Label htmlFor="select-all" className="text-sm font-bold cursor-pointer">Select All Visible</Label>
                         </div>
-                        <span className="text-xs font-bold text-muted-foreground">{selectedContactIds.length} / {contacts.length} Selected</span>
+                        <span className="text-xs font-bold text-muted-foreground">{selectedContactIds.length} Selected</span>
                       </div>
 
-                      <ScrollArea className="h-[300px] border rounded-3xl bg-muted/20">
+                      <ScrollArea className="h-[350px] border rounded-3xl bg-muted/20">
                         <div className="p-4 space-y-2">
                           {filteredContacts.length > 0 ? (
                             filteredContacts.map((contact) => (
@@ -321,7 +321,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                       </ScrollArea>
                     </TabsContent>
 
-                    <TabsContent value="manual" className="space-y-6">
+                    <TabsContent value="manual" className="space-y-6 flex-1">
                       <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Type or Paste Emails</Label>
                         <Textarea 
@@ -337,7 +337,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                         onClick={handleProcessManualEmails}
                         disabled={isProcessingManual || !manualEmails.trim()}
                       >
-                        {isProcessingManual ? "Processing..." : "Add to Audience"}
+                        {isProcessingManual ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</> : "Add to Audience"}
                       </Button>
                     </TabsContent>
                   </Tabs>
@@ -378,7 +378,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               )}
             </div>
 
-            <DialogFooter className="mt-8 flex items-center justify-between sm:justify-between w-full border-t pt-8">
+            <DialogFooter className="mt-auto px-10 pb-10 flex items-center justify-between sm:justify-between w-full border-t pt-8 bg-card">
               {step !== 'content' ? (
                 <Button variant="ghost" className="rounded-xl font-bold" onClick={() => {
                   if (step === 'audience') setStep('content');
