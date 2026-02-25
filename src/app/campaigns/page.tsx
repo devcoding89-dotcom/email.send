@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, serverTimestamp, doc, getDocs, limit, where } from "firebase/firestore";
+import { collection, query, orderBy, serverTimestamp, doc, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,8 @@ import { format } from "date-fns";
 import { deleteDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { sendCampaignEmail } from "@/app/actions/email-actions";
+import { personalizeTemplate } from "@/lib/extractor";
 
 interface Campaign {
   id: string;
@@ -66,7 +68,7 @@ export default function CampaignsPage() {
     });
   };
 
-  // High-Fidelity Campaign Runner Simulation
+  // Professional Outreach Engine Runner
   useEffect(() => {
     if (!user || !db || campaigns.length === 0) return;
 
@@ -75,48 +77,68 @@ export default function CampaignsPage() {
 
     const interval = setInterval(async () => {
       for (const campaign of activeCampaigns) {
-        // 1. Get total contacts to send to
+        // 1. Fetch contacts from the vault
         const contactsRef = collection(db, `users/${user.uid}/contacts`);
         const contactsSnap = await getDocs(query(contactsRef));
         const totalContacts = contactsSnap.size;
 
         if (totalContacts === 0) {
           updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'paused' });
-          toast({ variant: "destructive", title: "No Contacts", description: `Campaign "${campaign.name}" paused because your vault is empty.` });
+          toast({ variant: "destructive", title: "Empty Vault", description: `Campaign "${campaign.name}" paused. Add contacts to continue.` });
           continue;
         }
 
         const currentSent = campaign.stats?.sent || 0;
+        const currentFailed = campaign.stats?.failed || 0;
         
-        // 2. Determine batch size based on speed (EPM)
-        // Check every 5s, so batch is speed / 12
-        const batchSize = Math.max(1, Math.ceil(campaign.speed / 12));
-        const nextSentCount = Math.min(totalContacts, currentSent + batchSize);
+        // 2. Determine batch size based on EPM (Emails Per Minute)
+        // Interval is 10s, so batch = speed / 6
+        const batchSize = Math.max(1, Math.ceil(campaign.speed / 6));
+        const nextBatchEnd = Math.min(totalContacts, currentSent + batchSize);
 
         if (currentSent >= totalContacts) {
           updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
           continue;
         }
 
-        // 3. Update Stats
-        updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), {
-          "stats.sent": nextSentCount,
-          "stats.total": totalContacts
-        });
+        // 3. Process Batch: Personalize & Dispatch
+        let successfulSends = 0;
+        let failedSends = 0;
 
-        // 4. Create Simulated Logs
-        for (let i = currentSent; i < nextSentCount; i++) {
+        for (let i = currentSent; i < nextBatchEnd; i++) {
           const contact = contactsSnap.docs[i].data();
+          const personalizedBody = personalizeTemplate(campaign.body, contact);
+          const personalizedSubject = personalizeTemplate(campaign.subject, contact);
+
+          // Trigger Server Action for sending
+          const result = await sendCampaignEmail(contact.email, personalizedSubject, personalizedBody);
+
+          if (result.success) {
+            successfulSends++;
+          } else {
+            failedSends++;
+          }
+
+          // Log transaction
           addDocumentNonBlocking(collection(db, `users/${user.uid}/campaigns/${campaign.id}/logs`), {
             userId: user.uid,
             campaignId: campaign.id,
             contactEmail: contact.email,
-            status: 'sent',
+            status: result.success ? 'sent' : 'failed',
+            errorMessage: result.error || null,
+            simulated: result.status === 'simulated',
             timestamp: serverTimestamp()
           });
         }
+
+        // 4. Update Campaign Cumulative Stats
+        updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), {
+          "stats.sent": currentSent + successfulSends,
+          "stats.failed": currentFailed + failedSends,
+          "stats.total": totalContacts
+        });
       }
-    }, 5000);
+    }, 10000); // Check and send every 10 seconds
 
     return () => clearInterval(interval);
   }, [campaigns, user, db]);
@@ -179,7 +201,8 @@ export default function CampaignsPage() {
                         </div>
                         <Progress value={progress} className="h-2 rounded-full" />
                         <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                          <span>{campaign.stats.sent} Sent</span>
+                          <span className="text-green-600 font-bold">{campaign.stats.sent} Sent</span>
+                          {campaign.stats.failed > 0 && <span className="text-destructive font-bold">{campaign.stats.failed} Failed</span>}
                           <span>{campaign.stats.total} Total</span>
                         </div>
                       </div>
@@ -200,7 +223,7 @@ export default function CampaignsPage() {
                       disabled={campaign.status === 'completed'}
                     >
                       {campaign.status === 'sending' ? (
-                        <><Pause className="mr-2 h-4 w-4" /> Pause Sending</>
+                        <><Pause className="mr-2 h-4 w-4" /> Pause Outreach</>
                       ) : (
                         <><Play className="mr-2 h-4 w-4" /> {campaign.status === 'completed' ? 'Campaign Finished' : 'Launch Outreach'}</>
                       )}
