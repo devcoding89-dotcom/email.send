@@ -38,9 +38,9 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
 
-  // Simulation mode if credentials are missing or still set to placeholders
-  if (!user || !pass || user === 'your-brevo-email@example.com') {
-    console.log('SMTP Simulation Mode: Please set EMAIL_USER in .env to your Brevo email.');
+  // Simulation mode if credentials are still set to placeholders
+  if (!user || !pass || user === 'your-brevo-login-email@example.com' || user === 'your-brevo-email@example.com') {
+    console.log('SMTP Simulation Mode: Please set EMAIL_USER in .env to your real Brevo login email.');
     await new Promise(resolve => setTimeout(resolve, 500));
     return { success: true, status: 'simulated' };
   }
@@ -58,12 +58,22 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         pass: pass, // Your Brevo SMTP API Key
       },
       tls: {
-        rejectUnauthorized: false // Helps in some restricted environments
+        // Brevo requires modern TLS but sometimes fails on unauthorized certs in dev environments
+        rejectUnauthorized: false 
       }
     });
 
-    // Verify connection configuration
-    await transporter.verify();
+    // Verify connection configuration immediately to catch "Invalid Login"
+    try {
+      await transporter.verify();
+    } catch (verifyError: any) {
+      console.error('SMTP Verification Failed:', verifyError.message);
+      return { 
+        success: false, 
+        status: 'failed', 
+        error: `Authentication Failed: Ensure EMAIL_USER in .env is your Brevo login email and the key is correct.` 
+      };
+    }
 
     await transporter.sendMail({
       from: `"Scoutier Outreach" <${user}>`,
@@ -74,13 +84,7 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
     return { success: true, status: 'sent' };
   } catch (error: any) {
-    console.error('SMTP error detail:', error);
-    
-    let userFriendlyError = 'SMTP Transmission Error';
-    if (error.message.includes('Authentication failed') || error.message.includes('Invalid login')) {
-      userFriendlyError = 'Authentication Failed: Ensure EMAIL_USER is your Brevo login email and the API key is correct.';
-    }
-
-    return { success: false, status: 'failed', error: userFriendlyError };
+    console.error('SMTP Transmission error:', error.message);
+    return { success: false, status: 'failed', error: error.message || 'SMTP Transmission Error' };
   }
 }
