@@ -1,89 +1,72 @@
+
 {
   "entities": {
     "ParseResult": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ParseResult",
       "type": "object",
-      "description": "Represents the result of a text parsing and email extraction operation, including historical data and optionally saved campaigns.",
+      "description": "Represents the result of a text parsing and email extraction operation.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the ParseResult entity."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the User who initiated this parse result. This ID is managed by an external authentication system. (Relationship: User 1:N ParseResult)"
-        },
-        "rawText": {
-          "type": "string",
-          "description": "The original raw text input provided by the user for extraction."
-        },
-        "extractedEmails": {
-          "type": "array",
-          "description": "An array of unique and valid email addresses successfully extracted from the raw text.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "identifiedEntities": {
-          "type": "array",
-          "description": "An optional array of names or company information (e.g., 'John Doe', 'Acme Corp') identified from the raw text, along with emails, using an entity identification tool.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the parse operation was completed and the result was created.",
-          "format": "date-time"
-        },
-        "campaignTitle": {
-          "type": "string",
-          "description": "An optional title assigned by the user if this parse result is saved as a 'campaign' for later reuse."
-        },
-        "emailCount": {
-          "type": "number",
-          "description": "The total number of unique email addresses found in the 'extractedEmails' array. Provided for quick access and display in the user interface."
-        }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "rawText": { "type": "string" },
+        "extractedEmails": { "type": "array", "items": { "type": "string" } },
+        "identifiedEntities": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "campaignTitle": { "type": "string" },
+        "emailCount": { "type": "number" }
       },
-      "required": [
-        "id",
-        "userId",
-        "rawText",
-        "extractedEmails",
-        "createdAt"
-      ]
+      "required": ["id", "userId", "rawText", "extractedEmails", "createdAt"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "type": "object",
+      "description": "Represents an email outreach campaign.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string", "description": "Internal name for the campaign." },
+        "subject": { "type": "string", "description": "The subject line of the email." },
+        "body": { "type": "string", "description": "The email content with {{tokens}}." },
+        "status": { "type": "string", "enum": ["draft", "scheduled", "sending", "completed"] },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "speed": { "type": "number", "description": "Emails per minute." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "subject", "body", "status", "createdAt"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "type": "object",
+      "description": "A single contact for outreach.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "company": { "type": "string" },
+        "position": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "email", "createdAt"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}/parses/{parseResultId}",
-        "definition": {
-          "entityName": "ParseResult",
-          "schema": {
-            "$ref": "#/backend/entities/ParseResult"
-          },
-          "description": "Stores individual text parsing and email extraction results for a specific user. Each document represents a historical record or a saved 'campaign'. Includes denormalized 'userId' in the document and path for authorization independence.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user who owns this parse result."
-            },
-            {
-              "name": "parseResultId",
-              "description": "The unique identifier for a specific parse result document."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The recommended Firestore structure for Scoutier prioritizes secure, scalable, and easily debuggable authorization, adhering strictly to the core design principles. The primary structure will be a hierarchical path: `/users/{userId}/parses/{parseResultId}`.\n\n**Authorization Independence:** This structure critically achieves Authorization Independence by embedding the `userId` directly into the path for each user's `ParseResult` documents. Furthermore, the `ParseResult` entity itself contains a `userId` field. This dual presence of `userId` (in the path and within the document data) means that security rules can authorize requests by simply comparing `request.auth.uid` with the `{userId}` wildcard in the path, or with `resource.data.userId`. This completely eliminates the need for expensive and complex `get()` calls to parent documents to check ownership or membership. Consequently, atomic operations like transactions or batched writes involving a user's parse results will not be hindered by authorization dependencies.\n\n**QAPs (Rules are not Filters):** The structure inherently supports Querying All Possibilities (QAPs) for list operations. When a user queries `/users/{userId}/parses`, the security rules can be written as `allow list: if request.auth.uid == userId;`. This rule ensures that a user can only list their *own* parse results. Because each user's parse results are segregated under their specific `userId` path, Firestore's security rules can efficiently enforce ownership at the collection level. This prevents over-fetching and then filtering on the client or server, which is inefficient and insecure. The homogeneous security posture of documents within the `parses` subcollection (all are owned by the `userId` parent) simplifies these rules. The distinction between a general 'history parse' and a 'campaign' is handled by an optional `campaignTitle` field within the `ParseResult` document itself, rather than separate collections, as their authorization requirements (owner-only access) are identical. This aligns with the principle of Structural Segregation, where documents with similar security requirements reside together."
+    "/users/{userId}/parses/{parseResultId}": {
+      "schema": { "$ref": "#/backend/entities/ParseResult" },
+      "description": "Stores individual text parsing results."
+    },
+    "/users/{userId}/campaigns/{campaignId}": {
+      "schema": { "$ref": "#/backend/entities/Campaign" },
+      "description": "Stores email campaigns created by the user."
+    },
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": { "$ref": "#/backend/entities/Contact" },
+      "description": "Stores contacts for outreach."
+    }
   }
 }

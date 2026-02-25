@@ -1,120 +1,42 @@
+
 rules_version = '2';
-
-/**
- * Scoutier Firestore Security Rules
- *
- * CORE PHILOSOPHY:
- * This ruleset enforces a strict User-Ownership model. Access to data is gated by the 
- * authenticated user's ID, which must match the path parameters and document data.
- *
- * DATA STRUCTURE:
- * The primary data hierarchy is user-centric. All parsing results and campaigns are
- * stored in subcollections nested under the specific user who created them:
- * /users/{userId}/parses/{parseResultId}
- *
- * KEY SECURITY DECISIONS:
- * 1. Authorization Independence: The userId is stored both in the document path and 
- *    as a field ('userId') within the document. This allows for fast, local 
- *    authorization checks without performing additional cross-document lookups (get() calls).
- * 2. Strict Ownership: There is no public reading or writing. Only the authenticated 
- *    owner of a data tree can view, list, or modify their own documents.
- * 3. Relational Integrity: On creation, the rules enforce that the internal 'userId' 
- *    field matches the authenticated user's UID and the path parameter.
- * 4. Immutability: Once a document is created, the 'userId' field is immutable to 
- *    prevent data from being "transferred" or "re-parented" to other users.
- *
- * DENORMALIZATION FOR AUTHORIZATION:
- * To maximize performance and maintain low costs, the 'userId' is denormalized directly 
- * into every ParseResult document. This allows us to verify ownership in a single 
- * operation using `request.auth.uid`.
- *
- * PROTOTYPING MODE:
- * These rules focus heavily on secure authorization and relational integrity. They do 
- * NOT enforce strict data schemas (e.g., checking if a 'description' is a string) to 
- * allow for rapid frontend iteration without needing constant rule updates.
- */
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helper Functions ---
-
-    /**
-     * @description Checks if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
-
-    /**
-     * @description Checks if the user's UID matches the provided ID.
-     * @param userId The UID to check against.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    /**
-     * @description Combines ownership check with document existence for updates and deletes.
-     * @param userId The UID to check against.
-     */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
-
-    /**
-     * @description Verifies that the userId field in the document matches the path and the user.
-     * Used during creation to ensure data is correctly linked.
-     */
-    function isValidParseRelation(userId) {
+    function isValidRelation(userId) {
       return request.resource.data.userId == userId && request.resource.data.userId == request.auth.uid;
     }
 
-    /**
-     * @description Prevents the userId field from being changed after creation.
-     */
-    function isUserIdImmutable() {
-      return request.resource.data.userId == resource.data.userId;
-    }
-
-    // --- Collection Rules ---
-
-    /**
-     * @description Rules for the root user document.
-     * @path /users/{userId}
-     * @allow Authenticated user can create, read, or update their own profile.
-     * @deny Any user attempting to access a different user's profile.
-     * @principle Self-Creation and Ownership.
-     */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false; // Users should not be listable for privacy.
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if false; // Profiles are typically not deleted by users in this app.
+      allow create, update: if isOwner(userId);
     }
 
-    /**
-     * @description Rules for Parse Results and Saved Campaigns.
-     * @path /users/{userId}/parses/{parseResultId}
-     * @allow (get) If the user is the owner of the parent path.
-     * @allow (create) If the user is the owner and provides matching userId in the data.
-     * @deny (create) If the userId in the data doesn't match the path or the user's UID.
-     * @deny (update) If the user attempts to change the userId of the document.
-     * @principle Path-based authorization with internal relational integrity checks.
-     */
-    match /users/{userId}/parses/{parseResultId} {
-      
-      // Read: Only the owner can get a specific parse or list their parses.
-      allow get, list: if isOwner(userId);
+    match /users/{userId}/parses/{id} {
+      allow read, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidRelation(userId);
+      allow delete: if isExistingOwner(userId);
+    }
 
-      // Create: Owner only. Must ensure the data's userId matches the path.
-      allow create: if isOwner(userId) && isValidParseRelation(userId);
+    match /users/{userId}/campaigns/{id} {
+      allow read, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidRelation(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
 
-      // Update: Owner only. Must exist and cannot change the owner ID.
-      allow update: if isExistingOwner(userId) && isUserIdImmutable();
-
-      // Delete: Owner only. Must exist.
+    match /users/{userId}/contacts/{id} {
+      allow read, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidRelation(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
   }
