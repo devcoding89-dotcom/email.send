@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, serverTimestamp, query, orderBy, addDoc } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,10 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2 } from "lucide-react";
+import { Send, Type, Layers, Zap, Info, ArrowRight, Eye, Users, Search, CheckCircle2, MailPlus } from "lucide-react";
+import { extractEmails } from "@/lib/extractor";
 
 interface Contact {
   id: string;
@@ -37,6 +39,8 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
   const [step, setStep] = useState<"content" | "audience" | "config">("content");
   const [search, setSearch] = useState("");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [manualEmails, setManualEmails] = useState("");
+  const [isProcessingManual, setIsProcessingManual] = useState(false);
 
   // Fetch available contacts
   const contactsQuery = useMemoFirebase(() => {
@@ -61,7 +65,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     }
 
     if (selectedContactIds.length === 0) {
-      toast({ variant: "destructive", title: "No Audience", description: "Please select at least one contact for this campaign." });
+      toast({ variant: "destructive", title: "No Audience", description: "Please select or add at least one contact for this campaign." });
       return;
     }
 
@@ -89,6 +93,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     setSpeed([10]);
     setStep("content");
     setSelectedContactIds([]);
+    setManualEmails("");
   };
 
   const toggleContact = (id: string) => {
@@ -103,6 +108,53 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     } else {
       setSelectedContactIds(filteredContacts.map(c => c.id));
     }
+  };
+
+  const handleProcessManualEmails = async () => {
+    if (!user || !db || !manualEmails.trim()) return;
+    
+    setIsProcessingManual(true);
+    const emails = extractEmails(manualEmails);
+    
+    if (emails.length === 0) {
+      toast({ variant: "destructive", title: "No Emails Found", description: "We couldn't find any valid email addresses in your input." });
+      setIsProcessingManual(false);
+      return;
+    }
+
+    const newContactIds: string[] = [];
+    
+    for (const email of emails) {
+      // Check if contact already exists in vault
+      const existing = contacts.find(c => c.email.toLowerCase() === email.toLowerCase());
+      if (existing) {
+        if (!selectedContactIds.includes(existing.id)) {
+          newContactIds.push(existing.id);
+        }
+        continue;
+      }
+
+      // Create new contact
+      try {
+        const docRef = await addDoc(collection(db, `users/${user.uid}/contacts`), {
+          userId: user.uid,
+          email,
+          firstName: email.split('@')[0],
+          lastName: "Manual",
+          company: "Direct Entry",
+          position: "Lead",
+          createdAt: serverTimestamp()
+        });
+        newContactIds.push(docRef.id);
+      } catch (e) {
+        console.error("Error adding manual contact:", e);
+      }
+    }
+
+    setSelectedContactIds(prev => Array.from(new Set([...prev, ...newContactIds])));
+    setManualEmails("");
+    toast({ title: "Emails Added", description: `Successfully added ${newContactIds.length} contacts to the audience.` });
+    setIsProcessingManual(false);
   };
 
   const filteredContacts = contacts.filter(c => 
@@ -120,7 +172,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl p-0 overflow-hidden border-none rounded-[3rem] shadow-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-12 h-[80vh]">
+        <div className="grid grid-cols-1 md:grid-cols-12 h-[85vh]">
           {/* Sidebar / Progress */}
           <div className="md:col-span-4 bg-muted/30 p-10 flex flex-col justify-between">
             <div className="space-y-12">
@@ -158,7 +210,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               </div>
               <div className="p-6 bg-muted/50 rounded-[2rem]">
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  Tip: Smaller, highly-targeted lists often perform 2x better than broad "blast" campaigns.
+                  Tip: Direct entry allows you to quickly add emails without leaving the architect.
                 </p>
               </div>
             </div>
@@ -209,51 +261,86 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
 
               {step === 'audience' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 h-full flex flex-col">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search vault contacts..." 
-                      className="pl-12 h-12 rounded-xl" 
-                      value={search} 
-                      onChange={e => setSearch(e.target.value)} 
-                    />
-                  </div>
+                  <Tabs defaultValue="vault" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 h-14 bg-muted/50 rounded-2xl p-1 mb-8">
+                      <TabsTrigger value="vault" className="rounded-xl font-bold gap-2">
+                        <Users className="h-4 w-4" />
+                        Vault Leads
+                      </TabsTrigger>
+                      <TabsTrigger value="manual" className="rounded-xl font-bold gap-2">
+                        <MailPlus className="h-4 w-4" />
+                        Direct Entry
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="vault" className="space-y-6">
+                      <div className="relative">
+                        <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search vault contacts..." 
+                          className="pl-12 h-12 rounded-xl" 
+                          value={search} 
+                          onChange={e => setSearch(e.target.value)} 
+                        />
+                      </div>
 
-                  <div className="flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2">
-                      <Checkbox id="select-all" checked={selectedContactIds.length === filteredContacts.length && filteredContacts.length > 0} onCheckedChange={toggleAll} />
-                      <Label htmlFor="select-all" className="text-sm font-bold cursor-pointer">Select All Visible</Label>
-                    </div>
-                    <span className="text-xs font-bold text-muted-foreground">{selectedContactIds.length} / {contacts.length} Selected</span>
-                  </div>
-
-                  <ScrollArea className="flex-1 min-h-[300px] border rounded-3xl bg-muted/20">
-                    <div className="p-4 space-y-2">
-                      {filteredContacts.length > 0 ? (
-                        filteredContacts.map((contact) => (
-                          <div 
-                            key={contact.id} 
-                            className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${selectedContactIds.includes(contact.id) ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-muted/50'}`}
-                            onClick={() => toggleContact(contact.id)}
-                          >
-                            <div className="flex items-center gap-4">
-                              <Checkbox checked={selectedContactIds.includes(contact.id)} />
-                              <div>
-                                <p className="font-bold text-sm">{contact.firstName} {contact.lastName}</p>
-                                <p className="text-xs text-muted-foreground">{contact.email}</p>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="text-[10px]">{contact.company || 'Private'}</Badge>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-20">
-                          <Users className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
-                          <p className="text-muted-foreground font-medium">No contacts found in vault.</p>
+                      <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                          <Checkbox id="select-all" checked={selectedContactIds.length === filteredContacts.length && filteredContacts.length > 0} onCheckedChange={toggleAll} />
+                          <Label htmlFor="select-all" className="text-sm font-bold cursor-pointer">Select All Visible</Label>
                         </div>
-                      )}
-                    </div>
-                  </ScrollArea>
+                        <span className="text-xs font-bold text-muted-foreground">{selectedContactIds.length} / {contacts.length} Selected</span>
+                      </div>
+
+                      <ScrollArea className="h-[300px] border rounded-3xl bg-muted/20">
+                        <div className="p-4 space-y-2">
+                          {filteredContacts.length > 0 ? (
+                            filteredContacts.map((contact) => (
+                              <div 
+                                key={contact.id} 
+                                className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${selectedContactIds.includes(contact.id) ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-muted/50'}`}
+                                onClick={() => toggleContact(contact.id)}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <Checkbox checked={selectedContactIds.includes(contact.id)} />
+                                  <div>
+                                    <p className="font-bold text-sm">{contact.firstName} {contact.lastName}</p>
+                                    <p className="text-xs text-muted-foreground">{contact.email}</p>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="text-[10px]">{contact.company || 'Private'}</Badge>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-20">
+                              <Users className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+                              <p className="text-muted-foreground font-medium">No contacts found in vault.</p>
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+
+                    <TabsContent value="manual" className="space-y-6">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Type or Paste Emails</Label>
+                        <Textarea 
+                          placeholder="john@example.com, sarah@acme.co, test@gmail.com..." 
+                          className="min-h-[250px] rounded-3xl p-6 text-base font-body"
+                          value={manualEmails}
+                          onChange={e => setManualEmails(e.target.value)}
+                        />
+                      </div>
+                      <Button 
+                        variant="secondary" 
+                        className="w-full h-12 rounded-xl font-bold shadow-sm" 
+                        onClick={handleProcessManualEmails}
+                        disabled={isProcessingManual || !manualEmails.trim()}
+                      >
+                        {isProcessingManual ? "Processing..." : "Add to Audience"}
+                      </Button>
+                    </TabsContent>
+                  </Tabs>
                 </div>
               )}
 

@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { parseCSVContacts } from "@/lib/extractor";
+import { AddLeadDialog } from "@/components/contacts/AddLeadDialog";
 
 interface Contact {
   id: string;
@@ -31,6 +32,7 @@ export default function ContactsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [importing, setImporting] = useState(false);
+  const [showAddLead, setShowAddLead] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const contactsQuery = useMemoFirebase(() => {
@@ -114,7 +116,7 @@ export default function ContactsPage() {
               {importing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Upload className="mr-2 h-5 w-5" />}
               Import CSV
             </Button>
-            <Button size="lg" className="h-14 px-8 rounded-2xl font-bold shadow-lg shadow-primary/20">
+            <Button size="lg" className="h-14 px-8 rounded-2xl font-bold shadow-lg shadow-primary/20" onClick={() => setShowAddLead(true)}>
               <UserPlus className="mr-2 h-5 w-5" />
               Add Lead
             </Button>
@@ -187,6 +189,8 @@ export default function ContactsPage() {
           </CardContent>
         </Card>
       </main>
+
+      <AddLeadDialog open={showAddLead} onOpenChange={setShowAddLead} />
     </div>
   );
 }
