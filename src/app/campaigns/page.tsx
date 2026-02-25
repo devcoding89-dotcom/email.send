@@ -68,7 +68,6 @@ export default function CampaignsPage() {
     });
   };
 
-  // Professional Outreach Engine Runner
   useEffect(() => {
     if (!user || !db || campaigns.length === 0) return;
 
@@ -87,8 +86,6 @@ export default function CampaignsPage() {
           continue;
         }
 
-        // Determine batch size based on EPM (Emails Per Minute)
-        // Interval is 10s, so batch is speed/6
         const batchSize = Math.max(1, Math.ceil(campaign.speed / 6));
         const nextBatchEndIndex = Math.min(targetIds.length, totalAttempted + batchSize);
 
@@ -107,7 +104,6 @@ export default function CampaignsPage() {
 
           const contact = contactSnap.data();
 
-          // Pre-send validation (Client-side fast check)
           if (!validateEmailFormat(contact.email)) {
             failedSends++;
             addDocumentNonBlocking(collection(db, `users/${user.uid}/campaigns/${campaign.id}/logs`), {
@@ -124,7 +120,6 @@ export default function CampaignsPage() {
           const personalizedBody = personalizeTemplate(campaign.body, contact);
           const personalizedSubject = personalizeTemplate(campaign.subject, contact);
 
-          // Server Action handles deep validation (MX records) and sending
           const result = await sendCampaignEmail(contact.email, personalizedSubject, personalizedBody);
 
           if (result.success) {
@@ -159,20 +154,20 @@ export default function CampaignsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="container mx-auto px-4 py-16 max-w-7xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16">
-          <div className="space-y-4">
-            <h1 className="text-5xl font-bold font-headline">Campaign Center</h1>
-            <p className="text-xl text-muted-foreground">Orchestrate automated outreach with built-in MX validation.</p>
+      <main className="container mx-auto px-4 py-8 md:py-16 max-w-7xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 md:mb-16">
+          <div className="space-y-3">
+            <h1 className="text-4xl md:text-5xl font-bold font-headline">Campaign Center</h1>
+            <p className="text-lg md:text-xl text-muted-foreground">Orchestrate automated outreach with precision.</p>
           </div>
-          <Button onClick={() => setShowCreate(true)} size="lg" className="h-16 px-8 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20">
+          <Button onClick={() => setShowCreate(true)} size="lg" className="w-full md:w-auto h-14 md:h-16 px-8 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20">
             <Plus className="mr-2 h-6 w-6" />
             New Campaign
           </Button>
         </div>
 
         {campaigns.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {campaigns.map((campaign) => {
               const total = campaign.targetContactIds?.length || campaign.stats?.total || 0;
               const sent = campaign.stats?.sent || 0;
@@ -183,7 +178,7 @@ export default function CampaignsPage() {
                 <Card key={campaign.id} className={`group relative border-border/50 shadow-xl rounded-[2.5rem] overflow-hidden transition-all duration-300 ${campaign.status === 'sending' ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/50'}`}>
                   <CardHeader className="pb-4">
                     <div className="flex justify-between items-start mb-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Badge 
                           variant={campaign.status === 'completed' ? 'default' : campaign.status === 'sending' ? 'default' : 'secondary'} 
                           className={`rounded-full px-4 py-1 font-bold ${campaign.status === 'sending' ? 'bg-primary animate-pulse' : ''}`}
@@ -195,50 +190,50 @@ export default function CampaignsPage() {
                           Validated
                         </Badge>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setSelectedCampaign(campaign)}>
+                      <div className="flex gap-1 md:gap-2">
+                        <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8 md:h-10 md:w-10" onClick={() => setSelectedCampaign(campaign)}>
                           <BarChart3 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="rounded-xl hover:text-destructive" onClick={() => handleDelete(campaign.id)}>
+                        <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8 md:h-10 md:w-10 hover:text-destructive" onClick={() => handleDelete(campaign.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                    <CardTitle className="text-2xl font-headline font-black mb-1">{campaign.name}</CardTitle>
-                    <CardDescription className="line-clamp-1 italic">"{campaign.subject}"</CardDescription>
+                    <CardTitle className="text-xl md:text-2xl font-headline font-black mb-1 truncate">{campaign.name}</CardTitle>
+                    <CardDescription className="line-clamp-1 italic text-sm">"{campaign.subject}"</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                        <span>Transmission Status</span>
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        <span>Progress</span>
                         <span>{Math.round(progress)}%</span>
                       </div>
                       <Progress value={progress} className="h-2 rounded-full" />
-                      <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                        <span className="text-green-600 font-bold">{sent} Dispatched</span>
-                        {failed > 0 && <span className="text-destructive font-bold flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {failed} Blocked</span>}
-                        <span>{total} Targets</span>
+                      <div className="flex justify-between text-[9px] md:text-[10px] font-medium text-muted-foreground">
+                        <span className="text-green-600 font-bold">{sent} Sent</span>
+                        {failed > 0 && <span className="text-destructive font-bold flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {failed} Failed</span>}
+                        <span>{total} Total</span>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
+                    <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
                       <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
+                        <Clock className="h-3 w-3 md:h-4 md:w-4" />
                         {campaign.createdAt ? format(campaign.createdAt.toDate(), "MMM d, yyyy") : "..."}
                       </div>
-                      <Badge variant="outline" className="text-[10px]">{campaign.speed} EPM</Badge>
+                      <Badge variant="outline" className="text-[10px] px-2 py-0">{campaign.speed} EPM</Badge>
                     </div>
                     
                     <Button 
                       variant={campaign.status === 'sending' ? 'outline' : 'default'} 
-                      className="w-full rounded-xl h-12 font-bold shadow-lg"
+                      className="w-full rounded-xl h-11 md:h-12 font-bold shadow-lg"
                       onClick={() => toggleStatus(campaign)}
                       disabled={campaign.status === 'completed'}
                     >
                       {campaign.status === 'sending' ? (
-                        <><Pause className="mr-2 h-4 w-4" /> Stop Drip-Feed</>
+                        <><Pause className="mr-2 h-4 w-4" /> Stop Outreach</>
                       ) : (
-                        <><Play className="mr-2 h-4 w-4" /> {campaign.status === 'completed' ? 'Campaign Finished' : 'Launch Outreach'}</>
+                        <><Play className="mr-2 h-4 w-4" /> {campaign.status === 'completed' ? 'Finished' : 'Launch'}</>
                       )}
                     </Button>
                   </CardContent>
@@ -247,18 +242,18 @@ export default function CampaignsPage() {
             })}
           </div>
         ) : !isLoading ? (
-          <div className="flex flex-col items-center justify-center p-20 border-2 border-dashed rounded-[3rem] bg-muted/20">
-            <Send className="h-20 w-20 text-muted-foreground/20 mb-8" />
-            <h3 className="text-3xl font-bold font-headline mb-4">No Campaigns Found</h3>
-            <p className="text-muted-foreground text-lg mb-8 max-w-md text-center">
+          <div className="flex flex-col items-center justify-center p-12 md:p-20 border-2 border-dashed rounded-[2.5rem] md:rounded-[3rem] bg-muted/20 text-center">
+            <Send className="h-16 w-16 md:h-20 md:w-20 text-muted-foreground/20 mb-6 md:mb-8" />
+            <h3 className="text-2xl md:text-3xl font-bold font-headline mb-4">No Campaigns Found</h3>
+            <p className="text-muted-foreground text-base md:text-lg mb-8 max-w-md mx-auto">
               Define your message and hand-pick your audience to start your first campaign.
             </p>
-            <Button size="lg" className="rounded-2xl" onClick={() => setShowCreate(true)}>
+            <Button size="lg" className="rounded-2xl h-14 px-8" onClick={() => setShowCreate(true)}>
               Launch First Campaign
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1, 2, 3].map(i => (
               <div key={i} className="h-64 rounded-[2.5rem] bg-muted/40 animate-pulse" />
             ))}
