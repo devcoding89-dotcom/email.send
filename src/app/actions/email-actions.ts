@@ -1,4 +1,3 @@
-
 'use server';
 
 import nodemailer from 'nodemailer';
@@ -54,12 +53,14 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         user: user,
         pass: pass,
       },
-      // Some environments need this for Brevo
       requireTLS: true,
       tls: {
         rejectUnauthorized: false
       }
     });
+
+    // Verify connection configuration
+    await transporter.verify();
 
     // Send the email
     await transporter.sendMail({
@@ -76,9 +77,9 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     let userFriendlyError = "Failed to send email.";
     
     if (error.message.includes('Authentication failed') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: Brevo rejected Login ID: ${user}. Ensure your SMTP key is active.`;
+      userFriendlyError = `Authentication Failed: Brevo rejected Login ID: ${user}. Check your SMTP key.`;
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `Sender Error: The address ${senderEmail} must be a verified sender in Brevo.`;
+      userFriendlyError = `Sender Error: ${senderEmail} must be a verified sender in Brevo.`;
     } else {
       userFriendlyError = `Mail Error: ${error.message}`;
     }
