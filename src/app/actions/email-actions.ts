@@ -1,3 +1,4 @@
+
 'use server';
 
 import nodemailer from 'nodemailer';
@@ -34,36 +35,35 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
   const user = process.env.EMAIL_USER?.trim();
   const pass = process.env.EMAIL_PASS?.trim();
+  const senderEmail = process.env.SENDER_EMAIL?.trim() || user;
 
-  // Basic check for existence of credentials
   if (!user || !pass) {
     return { 
       success: false, 
       status: 'failed',
-      error: 'SMTP Configuration Missing: Please ensure EMAIL_USER and EMAIL_PASS are set in your .env file.'
+      error: 'SMTP Configuration Missing: Check EMAIL_USER and EMAIL_PASS in .env'
     };
   }
 
   try {
-    // Brevo SMTP Relay Configuration
     const transporter = nodemailer.createTransport({
       host: 'smtp-relay.brevo.com',
       port: 587,
-      secure: false, // TLS (use upgrade via STARTTLS)
+      secure: false, // TLS
       auth: {
         user: user,
         pass: pass,
       },
+      // Some environments need this for Brevo
+      requireTLS: true,
       tls: {
-        // Do not fail on invalid certs
         rejectUnauthorized: false
       }
     });
 
     // Send the email
-    // IMPORTANT: Brevo requires the 'from' address to be a verified sender in your account.
     await transporter.sendMail({
-      from: `"Scoutier Outreach" <${user}>`,
+      from: `"Scoutier Outreach" <${senderEmail}>`,
       to,
       subject,
       text: body,
@@ -75,11 +75,10 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     
     let userFriendlyError = "Failed to send email.";
     
-    // Catch common authentication errors
-    if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: Brevo rejected the credentials for ${user}. Please double-check your SMTP Key (Master Password) in Brevo Settings.`;
+    if (error.message.includes('Authentication failed') || error.code === 'EAUTH') {
+      userFriendlyError = `Authentication Failed: Brevo rejected Login ID: ${user}. Ensure your SMTP key is active.`;
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `Sender Error: The address ${user} must be a verified sender in your Brevo account dashboard.`;
+      userFriendlyError = `Sender Error: The address ${senderEmail} must be a verified sender in Brevo.`;
     } else {
       userFriendlyError = `Mail Error: ${error.message}`;
     }
