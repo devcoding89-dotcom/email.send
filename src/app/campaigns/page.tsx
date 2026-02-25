@@ -7,7 +7,7 @@ import { collection, query, orderBy, serverTimestamp, doc, getDoc } from "fireba
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Send, Clock, Play, Trash2, Pause, BarChart3, ShieldCheck } from "lucide-react";
+import { Plus, Send, Clock, Play, Trash2, Pause, BarChart3, ShieldCheck, AlertCircle } from "lucide-react";
 import { CreateCampaignDialog } from "@/components/campaigns/CreateCampaignDialog";
 import { CampaignStatsDialog } from "@/components/campaigns/CampaignStatsDialog";
 import { format } from "date-fns";
@@ -64,7 +64,7 @@ export default function CampaignsPage() {
 
     toast({ 
       title: newStatus === 'sending' ? "Outreach Started" : "Outreach Paused",
-      description: newStatus === 'sending' ? "Processing your targeted contacts with active validation." : "The drip feed has been halted."
+      description: newStatus === 'sending' ? "Running active multi-level validation on all dispatches." : "The drip feed has been halted."
     });
   };
 
@@ -78,27 +78,24 @@ export default function CampaignsPage() {
     const interval = setInterval(async () => {
       for (const campaign of activeCampaigns) {
         const targetIds = campaign.targetContactIds || [];
-        if (targetIds.length === 0) {
-          updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
-          continue;
-        }
-
         const currentSent = campaign.stats?.sent || 0;
         const currentFailed = campaign.stats?.failed || 0;
-        
-        // Determine batch size based on EPM (Emails Per Minute)
-        const batchSize = Math.max(1, Math.ceil(campaign.speed / 6));
-        const nextBatchEndIndex = Math.min(targetIds.length, currentSent + currentFailed + batchSize);
+        const totalAttempted = currentSent + currentFailed;
 
-        if (currentSent + currentFailed >= targetIds.length) {
+        if (totalAttempted >= targetIds.length) {
           updateDocumentNonBlocking(doc(db, `users/${user.uid}/campaigns`, campaign.id), { status: 'completed' });
           continue;
         }
+
+        // Determine batch size based on EPM (Emails Per Minute)
+        // Interval is 10s, so batch is speed/6
+        const batchSize = Math.max(1, Math.ceil(campaign.speed / 6));
+        const nextBatchEndIndex = Math.min(targetIds.length, totalAttempted + batchSize);
 
         let successfulSends = 0;
         let failedSends = 0;
 
-        for (let i = (currentSent + currentFailed); i < nextBatchEndIndex; i++) {
+        for (let i = totalAttempted; i < nextBatchEndIndex; i++) {
           const contactId = targetIds[i];
           const contactRef = doc(db, `users/${user.uid}/contacts`, contactId);
           const contactSnap = await getDoc(contactRef);
@@ -110,7 +107,7 @@ export default function CampaignsPage() {
 
           const contact = contactSnap.data();
 
-          // Pre-send validation
+          // Pre-send validation (Client-side fast check)
           if (!validateEmailFormat(contact.email)) {
             failedSends++;
             addDocumentNonBlocking(collection(db, `users/${user.uid}/campaigns/${campaign.id}/logs`), {
@@ -118,7 +115,7 @@ export default function CampaignsPage() {
               campaignId: campaign.id,
               contactEmail: contact.email,
               status: 'failed',
-              errorMessage: "Failed validation check (Invalid Format)",
+              errorMessage: "Pre-flight Validation Failed (Syntax)",
               timestamp: serverTimestamp()
             });
             continue;
@@ -127,6 +124,7 @@ export default function CampaignsPage() {
           const personalizedBody = personalizeTemplate(campaign.body, contact);
           const personalizedSubject = personalizeTemplate(campaign.subject, contact);
 
+          // Server Action handles deep validation (MX records) and sending
           const result = await sendCampaignEmail(contact.email, personalizedSubject, personalizedBody);
 
           if (result.success) {
@@ -165,7 +163,7 @@ export default function CampaignsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold font-headline">Campaign Center</h1>
-            <p className="text-xl text-muted-foreground">Orchestrate your automated outreach with precision and validation.</p>
+            <p className="text-xl text-muted-foreground">Orchestrate automated outreach with built-in MX validation.</p>
           </div>
           <Button onClick={() => setShowCreate(true)} size="lg" className="h-16 px-8 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20">
             <Plus className="mr-2 h-6 w-6" />
@@ -173,12 +171,13 @@ export default function CampaignsPage() {
           </Button>
         </div>
 
-        {!isLoading && campaigns.length > 0 ? (
+        {campaigns.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {campaigns.map((campaign) => {
               const total = campaign.targetContactIds?.length || campaign.stats?.total || 0;
               const sent = campaign.stats?.sent || 0;
-              const progress = total > 0 ? (sent / total) * 100 : 0;
+              const failed = campaign.stats?.failed || 0;
+              const progress = total > 0 ? ((sent + failed) / total) * 100 : 0;
               
               return (
                 <Card key={campaign.id} className={`group relative border-border/50 shadow-xl rounded-[2.5rem] overflow-hidden transition-all duration-300 ${campaign.status === 'sending' ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/50'}`}>
@@ -211,14 +210,14 @@ export default function CampaignsPage() {
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                        <span>Progress</span>
+                        <span>Transmission Status</span>
                         <span>{Math.round(progress)}%</span>
                       </div>
                       <Progress value={progress} className="h-2 rounded-full" />
                       <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                        <span className="text-green-600 font-bold">{sent} Sent</span>
-                        {campaign.stats && campaign.stats.failed > 0 && <span className="text-destructive font-bold">{campaign.stats.failed} Failed/Invalid</span>}
-                        <span>{total} Contacts</span>
+                        <span className="text-green-600 font-bold">{sent} Dispatched</span>
+                        {failed > 0 && <span className="text-destructive font-bold flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {failed} Blocked</span>}
+                        <span>{total} Targets</span>
                       </div>
                     </div>
                     
@@ -237,7 +236,7 @@ export default function CampaignsPage() {
                       disabled={campaign.status === 'completed'}
                     >
                       {campaign.status === 'sending' ? (
-                        <><Pause className="mr-2 h-4 w-4" /> Pause Outreach</>
+                        <><Pause className="mr-2 h-4 w-4" /> Stop Drip-Feed</>
                       ) : (
                         <><Play className="mr-2 h-4 w-4" /> {campaign.status === 'completed' ? 'Campaign Finished' : 'Launch Outreach'}</>
                       )}

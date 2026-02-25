@@ -2,6 +2,9 @@
  * Utility functions for email extraction, personalization, and CSV handling.
  */
 
+/**
+ * Extracts unique email addresses from raw text using pattern matching.
+ */
 export function extractEmails(text: string): string[] {
   if (!text) return [];
   
@@ -15,10 +18,12 @@ export function extractEmails(text: string): string[] {
 
 /**
  * Robust email syntax validation using a comprehensive regex.
+ * Checks for proper local-part, @ symbol, and domain structure.
  */
 export function validateEmailFormat(email: string): boolean {
   if (!email || email.length > 254) return false;
   
+  // Standard RFC 5322 regex
   const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   
   if (!emailRegex.test(email)) return false;
@@ -28,25 +33,31 @@ export function validateEmailFormat(email: string): boolean {
 
   const domain = parts[1];
   const domainParts = domain.split(".");
-  if (domainParts.length < 2) return false;
+  
+  // Ensure domain has at least one dot and a TLD of at least 2 chars
+  if (domainParts.length < 2 || domainParts[domainParts.length - 1].length < 2) return false;
 
   return true;
 }
 
+/**
+ * Generates a simple CSV string from an array of emails.
+ */
 export function generateCSV(emails: string[]): string {
   if (!emails.length) return "";
   return "Email Address\n" + emails.join("\n");
 }
 
+/**
+ * Parses CSV text into structured contact objects.
+ */
 export function parseCSVContacts(csvText: string): any[] {
   const lines = csvText.split(/\r?\n/);
   if (lines.length < 2) return [];
   
-  // Clean headers
   const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
   const results = [];
   
-  // Find email column index
   const emailIdx = headers.findIndex(h => h === 'email' || h === 'email address');
   if (emailIdx === -1) return [];
 
@@ -54,10 +65,9 @@ export function parseCSVContacts(csvText: string): any[] {
     const line = lines[i].trim();
     if (!line) continue;
     
-    // Simple CSV parser that handles basic commas
     const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-    
     const email = values[emailIdx];
+    
     if (email && validateEmailFormat(email)) {
       const contact: any = {
         email: email.toLowerCase(),
@@ -73,6 +83,9 @@ export function parseCSVContacts(csvText: string): any[] {
   return results;
 }
 
+/**
+ * Replaces {{tokens}} in a template with actual contact data.
+ */
 export function personalizeTemplate(template: string, contact: any): string {
   if (!template) return "";
   let personalized = template;
@@ -86,6 +99,9 @@ export function personalizeTemplate(template: string, contact: any): string {
   return personalized;
 }
 
+/**
+ * Triggers a browser download of a generated file.
+ */
 export function downloadFile(content: string, fileName: string, contentType: string) {
   if (typeof document === 'undefined') return;
   
