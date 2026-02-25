@@ -10,11 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Type, Layers, Zap, Info, ArrowRight } from "lucide-react";
+import { Send, Type, Layers, Zap, Info, ArrowRight, Eye } from "lucide-react";
 
 export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
@@ -36,7 +35,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
   const handleCreate = () => {
     if (!user || !db) return;
     if (!name || !subject || !body) {
-      toast({ variant: "destructive", title: "Missing Information", description: "Please fill out all required fields." });
+      toast({ variant: "destructive", title: "Missing Information", description: "All fields are required to build a campaign." });
       return;
     }
 
@@ -47,10 +46,11 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
       body,
       speed: speed[0],
       status: "draft",
+      stats: { total: 0, sent: 0, failed: 0 },
       createdAt: serverTimestamp(),
     });
 
-    toast({ title: "Campaign Saved", description: "Your campaign has been created and saved as a draft." });
+    toast({ title: "Campaign Saved", description: "Your outreach is ready. Launch it from the dashboard." });
     onOpenChange(false);
     reset();
   };
@@ -62,6 +62,11 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
     setSpeed([10]);
     setStep("content");
   };
+
+  const personalizedPreview = body
+    .replace(/\{\{firstName\}\}/g, "John")
+    .replace(/\{\{company\}\}/g, "Acme Inc")
+    .replace(/\{\{position\}\}/g, "Growth Lead");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,9 +84,8 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               
               <div className="space-y-8">
                 {[
-                  { id: 'content', label: 'Message Content', icon: Type },
-                  { id: 'config', label: 'Configuration', icon: Layers },
-                  { id: 'schedule', label: 'Scheduling', icon: Send }
+                  { id: 'content', label: 'Message Design', icon: Type },
+                  { id: 'config', label: 'Speed & Drip', icon: Layers }
                 ].map((s) => (
                   <div key={s.id} className={`flex items-center gap-4 transition-all ${step === s.id ? 'text-primary scale-105' : 'text-muted-foreground opacity-50'}`}>
                     <div className={`p-3 rounded-2xl ${step === s.id ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-muted'}`}>
@@ -97,7 +101,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
               <div className="flex items-start gap-3">
                 <Info className="h-4 w-4 text-primary mt-1" />
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  Use personalization tokens to increase conversion. Your contacts will feel the human touch.
+                  Tip: Emails using personalization tokens like <code className="text-primary">firstName</code> see 40% higher reply rates.
                 </p>
               </div>
             </div>
@@ -106,34 +110,36 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
           {/* Main Form */}
           <div className="md:col-span-8 bg-card p-10">
             <DialogHeader className="mb-10">
-              <DialogTitle className="text-4xl font-headline font-black">Design Outreach</DialogTitle>
-              <DialogDescription className="text-lg">Build a campaign that converts raw leads into conversations.</DialogDescription>
+              <DialogTitle className="text-4xl font-headline font-black">Outreach Architect</DialogTitle>
+              <DialogDescription className="text-lg">Design a campaign that feels human, at scale.</DialogDescription>
             </DialogHeader>
 
             {step === 'content' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-                <div className="space-y-3">
-                  <Label className="text-sm font-black uppercase tracking-widest text-muted-foreground">Internal Name</Label>
-                  <Input placeholder="e.g., Q1 Product Launch" className="h-14 rounded-2xl text-lg font-medium" value={name} onChange={e => setName(e.target.value)} />
-                </div>
-                <div className="space-y-3">
-                  <Label className="text-sm font-black uppercase tracking-widest text-muted-foreground">Email Subject</Label>
-                  <Input placeholder="Personalized subject line..." className="h-14 rounded-2xl text-lg font-medium" value={subject} onChange={e => setSubject(e.target.value)} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Label</Label>
+                    <Input placeholder="e.g., Q1 Outreach" className="h-12 rounded-xl" value={name} onChange={e => setName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Email Subject</Label>
+                    <Input placeholder="Check this out, {{firstName}}!" className="h-12 rounded-xl" value={subject} onChange={e => setSubject(e.target.value)} />
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm font-black uppercase tracking-widest text-muted-foreground">Email Body</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Message Body</Label>
                     <div className="flex gap-1.5">
                       {tokens.map(t => (
-                        <Badge key={t} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all rounded-lg py-1" onClick={() => insertToken(t)}>
+                        <Badge key={t} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all rounded-lg py-1 text-[10px]" onClick={() => insertToken(t)}>
                           +{t}
                         </Badge>
                       ))}
                     </div>
                   </div>
                   <Textarea 
-                    placeholder="Write your message here. Use tokens for personalization..." 
-                    className="min-h-[200px] rounded-3xl p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
+                    placeholder="Hi {{firstName}}, I noticed {{company}}..." 
+                    className="min-h-[250px] rounded-[2rem] p-6 text-lg font-body leading-relaxed border-muted-foreground/20 focus:border-primary"
                     value={body}
                     onChange={e => setBody(e.target.value)}
                   />
@@ -146,26 +152,30 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                 <div className="space-y-6">
                   <div className="flex justify-between items-end">
                     <div className="space-y-2">
-                      <Label className="text-sm font-black uppercase tracking-widest text-muted-foreground">Sending Velocity</Label>
-                      <p className="text-muted-foreground text-sm">Control the drip rate to avoid spam filters.</p>
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sending Velocity</Label>
+                      <p className="text-muted-foreground text-sm">Control how fast your outreach is dispatched.</p>
                     </div>
                     <span className="text-3xl font-black font-headline text-primary">{speed[0]} <small className="text-xs uppercase">EPM</small></span>
                   </div>
-                  <Slider value={speed} onValueChange={setSpeed} max={100} step={1} className="py-4" />
+                  <Slider value={speed} onValueChange={setSpeed} max={100} min={1} step={1} className="py-4" />
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    <span>Precision Drip (1)</span>
-                    <span>Aggressive Outreach (100)</span>
+                    <span>Precision Drip</span>
+                    <span>High Volume</span>
                   </div>
                 </div>
 
                 <div className="p-8 rounded-[2.5rem] bg-accent/5 border border-accent/10 space-y-4">
-                  <h4 className="font-bold flex items-center gap-2 text-accent">
-                    <Zap className="h-4 w-4" />
-                    Preview Personalization
+                  <h4 className="font-bold flex items-center gap-2 text-accent uppercase text-xs tracking-widest">
+                    <Eye className="h-4 w-4" />
+                    Personalization Preview
                   </h4>
-                  <p className="text-sm italic text-muted-foreground bg-white/50 p-4 rounded-2xl border border-accent/10">
-                    "{body.replace(/\{\{firstName\}\}/g, "Alex").substring(0, 150)}..."
-                  </p>
+                  <div className="bg-background/50 p-6 rounded-2xl border border-accent/10 text-sm font-medium leading-relaxed italic text-muted-foreground">
+                    {body ? (
+                      personalizedPreview.split('\n').map((line, i) => <p key={i}>{line}</p>)
+                    ) : (
+                      "Start typing your message to see a personalized preview here."
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -173,7 +183,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
             <DialogFooter className="mt-12 flex items-center justify-between sm:justify-between w-full">
               {step !== 'content' ? (
                 <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setStep('content')}>
-                  Back
+                  Back to Design
                 </Button>
               ) : (
                 <div />
@@ -183,12 +193,12 @@ export function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, on
                 <Button variant="outline" className="rounded-xl font-bold h-12" onClick={() => onOpenChange(false)}>Cancel</Button>
                 {step === 'content' ? (
                   <Button className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20" onClick={() => setStep('config')}>
-                    Configure
+                    Configure Drip
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
                   <Button className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20" onClick={handleCreate}>
-                    Create Campaign
+                    Finalize & Save
                   </Button>
                 )}
               </div>

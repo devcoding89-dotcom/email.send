@@ -1,5 +1,6 @@
+
 /**
- * Utility functions for email extraction and file handling.
+ * Utility functions for email extraction, personalization, and CSV handling.
  */
 
 export function extractEmails(text: string): string[] {
@@ -29,21 +30,29 @@ export function parseCSVContacts(csvText: string): any[] {
   const lines = csvText.split(/\r?\n/);
   if (lines.length < 2) return [];
   
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  // Clean headers
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
   const results = [];
   
+  // Find email column index
+  const emailIdx = headers.findIndex(h => h === 'email' || h === 'email address');
+  if (emailIdx === -1) return [];
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
+    // Simple CSV parser that handles basic commas (not quoted ones for now for speed)
     const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-    const contact: any = {};
     
-    headers.forEach((header, index) => {
-      contact[header] = values[index] || "";
-    });
-    
-    if (contact.email) {
+    if (values[emailIdx]) {
+      const contact: any = {
+        email: values[emailIdx],
+        firstName: values[headers.indexOf('firstname')] || values[headers.indexOf('first name')] || "",
+        lastName: values[headers.indexOf('lastname')] || values[headers.indexOf('last name')] || "",
+        company: values[headers.indexOf('company')] || values[headers.indexOf('organization')] || "",
+        position: values[headers.indexOf('position')] || values[headers.indexOf('role')] || "Lead"
+      };
       results.push(contact);
     }
   }
@@ -52,6 +61,7 @@ export function parseCSVContacts(csvText: string): any[] {
 }
 
 export function personalizeTemplate(template: string, contact: any): string {
+  if (!template) return "";
   let personalized = template;
   const tokens = ['firstName', 'lastName', 'email', 'company', 'position'];
   
