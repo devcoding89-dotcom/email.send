@@ -1,11 +1,13 @@
+
 "use client";
 
-import { useCollection, useMemoFirebase } from "@/firebase";
+import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
 import { BarChart3, Mail, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 
@@ -18,14 +20,16 @@ interface CampaignLog {
 }
 
 export function CampaignStatsDialog({ campaign, open, onOpenChange }: { campaign: any, open: boolean, onOpenChange: (open: boolean) => void }) {
+  const db = useFirestore();
+
   const logsQuery = useMemoFirebase(() => {
-    if (!campaign) return null;
+    if (!campaign || !db) return null;
     return query(
-      collection(campaign.db || {}, `users/${campaign.userId}/campaigns/${campaign.id}/logs`),
+      collection(db, `users/${campaign.userId}/campaigns/${campaign.id}/logs`),
       orderBy("timestamp", "desc"),
       limit(50)
     );
-  }, [campaign]);
+  }, [campaign, db]);
 
   const { data: logsData, isLoading } = useCollection<CampaignLog>(logsQuery);
   const logs = logsData || [];

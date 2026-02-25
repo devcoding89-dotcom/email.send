@@ -3,14 +3,15 @@
 
 import { useState } from "react";
 import { useUser, useFirestore } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, serverTimestamp, addDoc } from "firebase/firestore";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Mail, Building, Briefcase, Loader2 } from "lucide-react";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export function AddLeadDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
@@ -33,21 +34,29 @@ export function AddLeadDialog({ open, onOpenChange }: { open: boolean, onOpenCha
     }
 
     setLoading(true);
-    try {
-      addDocumentNonBlocking(collection(db, `users/${user.uid}/contacts`), {
-        ...formData,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-
+    const colRef = collection(db, `users/${user.uid}/contacts`);
+    
+    addDoc(colRef, {
+      ...formData,
+      userId: user.uid,
+      createdAt: serverTimestamp()
+    })
+    .then(() => {
       toast({ title: "Lead Added", description: `${formData.email} has been saved to your vault.` });
       setFormData({ firstName: "", lastName: "", email: "", company: "", position: "" });
       onOpenChange(false);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not save lead. Please try again." });
-    } finally {
+    })
+    .catch(async (error) => {
+      const permissionError = new FirestorePermissionError({
+        path: colRef.path,
+        operation: 'create',
+        requestResourceData: formData,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    })
+    .finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   return (
