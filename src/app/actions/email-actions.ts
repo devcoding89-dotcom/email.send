@@ -36,11 +36,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const pass = process.env.EMAIL_PASS?.trim();
 
   // Configuration check
-  if (!user || !pass || user === 'your-brevo-email@example.com' || user.includes('REPLACE')) {
+  if (!user || !pass || user.includes('example.com')) {
     return { 
       success: false, 
       status: 'failed',
-      error: 'SMTP Configuration Required: Please update your credentials in the .env file.'
+      error: 'SMTP Configuration Required: Please check your EMAIL_USER in the .env file.'
     };
   }
 
@@ -54,13 +54,10 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
         user: user,
         pass: pass,
       },
-      tls: {
-        // Brevo requires TLS, this ensures connection stability
-        rejectUnauthorized: false 
-      }
     });
 
     // Send the email
+    // IMPORTANT: Brevo requires the 'from' address to be a verified sender in your account.
     await transporter.sendMail({
       from: `"Scoutier Outreach" <${user}>`,
       to,
@@ -76,13 +73,11 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
     
     // Catch common authentication errors
     if (error.message.includes('Authentication failed') || error.message.includes('Invalid login') || error.code === 'EAUTH') {
-      userFriendlyError = `Authentication Failed: Please ensure your Brevo email (${user}) and SMTP key are correct in the .env file.`;
+      userFriendlyError = `Authentication Failed: Please ensure your Brevo email (${user}) and the SMTP key in your .env are correct. Note: Use the SMTP Key, not the API Key.`;
     } else if (error.message.includes('unauthorized sender')) {
-      userFriendlyError = `Sender Error: The address ${user} must be a verified sender in your Brevo account.`;
-    } else if (error.code === 'ETIMEDOUT') {
-      userFriendlyError = "Connection Timeout: Could not reach Brevo SMTP servers.";
+      userFriendlyError = `Sender Error: The address ${user} must be a verified sender in your Brevo account dashboard.`;
     } else {
-      userFriendlyError = `SMTP Error: ${error.message}`;
+      userFriendlyError = `Mail Error: ${error.message}`;
     }
 
     return { 
