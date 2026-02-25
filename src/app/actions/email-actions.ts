@@ -1,3 +1,4 @@
+
 'use server';
 
 import nodemailer from 'nodemailer';
@@ -37,22 +38,32 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
 
-  // Simulation mode if credentials are missing
-  if (!user || !pass) {
+  // Simulation mode if credentials are missing or still set to placeholders
+  if (!user || !pass || user === 'your-brevo-email@example.com') {
+    console.log('SMTP Simulation Mode: Please set EMAIL_USER in .env to your Brevo email.');
     await new Promise(resolve => setTimeout(resolve, 500));
     return { success: true, status: 'simulated' };
   }
 
   try {
     // Configure for Brevo SMTP Relay
+    // Host: smtp-relay.brevo.com
+    // Port: 587 (TLS)
     const transporter = nodemailer.createTransport({
       host: 'smtp-relay.brevo.com',
       port: 587,
+      secure: false, // Use STARTTLS
       auth: {
-        user: user, // Usually your Brevo account email
-        pass: pass, // Your Brevo API Key
+        user: user, // Your Brevo account email
+        pass: pass, // Your Brevo SMTP API Key
       },
+      tls: {
+        rejectUnauthorized: false // Helps in some restricted environments
+      }
     });
+
+    // Verify connection configuration
+    await transporter.verify();
 
     await transporter.sendMail({
       from: `"Scoutier Outreach" <${user}>`,
@@ -63,7 +74,13 @@ export async function sendCampaignEmail(to: string, subject: string, body: strin
 
     return { success: true, status: 'sent' };
   } catch (error: any) {
-    console.error('SMTP error:', error);
-    return { success: false, status: 'failed', error: error.message || 'SMTP Transmission Error' };
+    console.error('SMTP error detail:', error);
+    
+    let userFriendlyError = 'SMTP Transmission Error';
+    if (error.message.includes('Authentication failed') || error.message.includes('Invalid login')) {
+      userFriendlyError = 'Authentication Failed: Ensure EMAIL_USER is your Brevo login email and the API key is correct.';
+    }
+
+    return { success: false, status: 'failed', error: userFriendlyError };
   }
 }
